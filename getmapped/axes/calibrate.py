@@ -72,6 +72,11 @@ def unfold_symmetric(anchors: Anchors, axis: str) -> Anchors:
             and all(right[i] <= right[i + 1] for i in range(len(right) - 1)))
     if not is_v:
         return anchors
+    # a genuine ±-fold has MIRROR arms (comparable magnitudes + lengths). If the arms are wildly different
+    # it's a stray outlier label faking a V (e.g. an x-axis number bleeding into the y-band), not a fold.
+    lmax, rmax = max(left), max(right)
+    if min(lmax, rmax) < 0.5 * max(lmax, rmax) or abs(len(left) - len(right)) > 2:
+        return anchors
     out: Anchors = []
     for i, (pos, v) in enumerate(a):
         neg = (axis == "y" and i > ti) or (axis == "x" and i < ti)
@@ -102,12 +107,15 @@ def robust_fit(anchors: Anchors) -> tuple[float, float, float, int]:
         mm, bb = np.polyfit(pk, vk, 1)
         r = float(np.corrcoef(pk, vk)[0, 1]) if int(keep.sum()) > 2 else 1.0
         scale, offset, r_out, n_dropped = float(mm), float(bb), abs(r), int((~keep).sum())
+        gpos, gval = pk, vk
     else:
         scale, offset, r_out, n_dropped = m, b, abs(float(np.corrcoef(pos, val)[0, 1])), 0
-    # Degenerate-fit guard: labels vary but the map is near-constant (scale~0). This is the folded-axis
-    # signature (median of mixed-sign slopes ~ 0). Fail LOUD instead of returning a flat axis with r=1.0.
-    val_range = float(val.max() - val.min())
-    pos_span = float(pos.max() - pos.min())
+        gpos, gval = pos, val
+    # Degenerate-fit guard: labels vary but the map is near-constant (scale~0) — the folded-axis signature
+    # (median of mixed-sign slopes ~ 0). Measured over the INLIERS, so a single dropped outlier label (e.g. an
+    # x-axis number bleeding into the y-band) doesn't inflate the range and false-trip the guard.
+    val_range = float(gval.max() - gval.min())
+    pos_span = float(gpos.max() - gpos.min())
     if val_range > 1e-9 and abs(scale) * pos_span < 0.05 * val_range:
         raise CalibrationError(
             "axis labels vary but the fit is near-constant (scale~0) — likely a folded ±-symmetric axis "

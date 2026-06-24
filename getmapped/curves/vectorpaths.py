@@ -38,9 +38,22 @@ def mono_x_segments(P: NDArray) -> list[NDArray]:
     return [seg[::-1] if seg[-1, 0] < seg[0, 0] else seg for seg in segs]
 
 
+def _is_valley_join(cur: NDArray, t: NDArray, k: int = 8, margin: float = 2.0) -> bool:
+    """True if joining cur's END to t's START sits at a VALLEY — the join point is lower in data (higher
+    source-y) than its neighbours a few points back in `cur` and forward in `t`. That's two lobes meeting at
+    the baseline, not a broken stroke continuing the same way (where the neighbours straddle the join). Refusing
+    valley joins stops adjacent lobes merging into one full-width curve, while still rejoining broken strokes."""
+    n = len(cur)
+    yb = float(np.mean(cur[max(0, n - k - 1):n - 1, 1])) if n > 1 else float(cur[-1, 1])
+    ya = float(np.mean(t[1:k + 1, 1])) if len(t) > 1 else float(t[0, 1])
+    ey = float(cur[-1, 1])
+    return ey > yb + margin and ey > ya + margin
+
+
 def chain_curves(segs: list[NDArray], xtol: float = 4.0, ytol: float = 6.0) -> list[NDArray]:
     """Chain x-increasing segments where one's END ~ next's START (both x and y). Rebuilds a curve whose
-    stroke the PDF broke at a crossing (its descending tail orphaned into the next path object)."""
+    stroke the PDF broke at a crossing (its descending tail orphaned into the next path object) — but refuses
+    a join that sits at a valley, so two adjacent lobes meeting at the baseline are not merged into one."""
     segs = sorted(segs, key=lambda s: s[0, 0])
     used = [False] * len(segs)
     curves: list[NDArray] = []
@@ -56,7 +69,7 @@ def chain_curves(segs: list[NDArray], xtol: float = 4.0, ytol: float = 6.0) -> l
             for j, t in enumerate(segs):
                 if used[j]:
                     continue
-                if abs(t[0, 0] - ex) < xtol and abs(t[0, 1] - ey) < ytol:
+                if abs(t[0, 0] - ex) < xtol and abs(t[0, 1] - ey) < ytol and not _is_valley_join(cur, t):
                     cur = np.vstack([cur, t])
                     used[j] = True
                     ex, ey = cur[-1]

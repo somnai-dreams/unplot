@@ -210,6 +210,36 @@ def build_lobes_with_decoy(path: str) -> dict:
     return {"frame": fr, "peaks": [440.0, 550.0, 640.0]}
 
 
+def build_adjacent_band_lobes(path: str) -> dict:
+    """Three MONO lobes, each drawn over its OWN adjacent x-band so their tails meet at the baseline (400-500,
+    500-600, 600-700; peaks 450/550/650). Endpoint-continuity chaining merges all three into one full-width
+    curve unless the valley-join is refused — the real datasheet shape behind the 'two lobes merged' tangle."""
+    fr = (60.0, 40.0, 360.0, 240.0)
+    x0, y0, x1, y1 = fr
+
+    def x2px(x):
+        return x0 + (x - 400.0) / 300.0 * (x1 - x0)
+
+    def v2py(v):
+        return y1 - v / 2.0 * (y1 - y0)
+
+    doc = fitz.open()
+    pg = doc.new_page(width=420, height=300)
+    box = [fitz.Point(x0, y0), fitz.Point(x1, y0), fitz.Point(x1, y1), fitz.Point(x0, y1), fitz.Point(x0, y0)]
+    sh = pg.new_shape(); sh.draw_polyline(box); sh.finish(color=(0, 0, 0), width=0.8); sh.commit()
+    for t in (400, 500, 600, 700):
+        pg.insert_text(fitz.Point(x2px(t) - 6, y1 + 12), str(t), fontsize=8)
+    for t in (0, 1, 2):
+        pg.insert_text(fitz.Point(x0 - 16, v2py(t) + 3), str(t), fontsize=8)
+    for lo, hi, peak in [(400, 500, 450), (500, 600, 550), (600, 700, 650)]:
+        nm = np.arange(float(lo), hi + 0.01, 2.0)
+        v = 1.6 * np.exp(-0.5 * ((nm - peak) / 22.0) ** 2)
+        pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(nm, v)]
+        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.4, closePath=False); sh.commit()
+    doc.save(path); doc.close()
+    return {"frame": fr, "peaks": [450.0, 550.0, 650.0]}
+
+
 if __name__ == "__main__":
     import sys
     meta = build(sys.argv[1] if len(sys.argv) > 1 else "/tmp/getmapped_synth.pdf")
