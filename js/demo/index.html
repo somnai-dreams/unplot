@@ -9,6 +9,7 @@
   :root {
     --bg: #14161a; --panel: #1c1f26; --line: #2b2f38; --fg: #e6e9ef; --muted: #98a0ad;
     --accent: #6ea8fe; --good: #57c98a; --warn: #e0b341; --bad: #e06c6c; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);   /* stronger than the built-in ease-out */
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, sans-serif; }
@@ -21,24 +22,43 @@
   .controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
   .controls select, .controls input[type=number] {
     width: 100%; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font: inherit;
+    transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+  }
+  .controls select:focus-visible, .controls input:focus-visible {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110, 168, 254, .18);
   }
   .controls .row { display: flex; gap: 10px; align-items: center; }
   .controls .row input[type=checkbox] { width: 16px; height: 16px; }
   .controls .row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }
   button {
     background: var(--accent); color: #0b0d10; border: 0; border-radius: 7px; padding: 9px 12px; font: inherit; font-weight: 600; cursor: pointer;
+    transition: transform 140ms var(--ease-out), background-color 140ms ease, border-color 140ms ease, opacity 140ms ease;
   }
   button.ghost { background: var(--panel); color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
+  button:active:not(:disabled) { transform: scale(0.97); }   /* press feedback: the UI heard you */
+  button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(110, 168, 254, .3); }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  @media (hover: hover) and (pointer: fine) {
+    button:not(:disabled):hover { background: #83b6ff; }
+    button.ghost:not(:disabled):hover { background: #20242c; border-color: #3a4150; }
+  }
   .viewer { padding: 18px; overflow: auto; }
   #drop {
-    border: 1.5px dashed var(--line); border-radius: 12px; padding: 40px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s;
+    border: 1.5px dashed var(--line); border-radius: 12px; padding: 40px; text-align: center; color: var(--muted); cursor: pointer;
+    transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out), color 160ms var(--ease-out);
   }
   #drop.hot { border-color: var(--accent); color: var(--fg); background: #1a2230; }
+  @media (hover: hover) and (pointer: fine) { #drop:hover { border-color: #3a4150; color: var(--fg); } }
   .stage { position: relative; display: inline-block; line-height: 0; }
-  .stage canvas { border: 1px solid var(--line); border-radius: 6px; display: block; }
+  .stage.enter { animation: stageIn 360ms var(--ease-out) both; }
+  .stage canvas { border: 1px solid var(--line); border-radius: 6px; display: block; transition: opacity 360ms var(--ease-out); }
+  /* once curves are recovered, dim the source render so the extracted overlay reads as the hero (and you can
+     see it trace on); the dimmed original stays visible behind, proving the overlay lands on it. */
+  .stage.has-result canvas { opacity: 0.45; }
   .stage svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+  #overlay rect { transition: opacity 320ms var(--ease-out); }
   .setqa { margin: 16px 0 10px; font-size: 13px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
+  .setqa.enter { animation: fadeIn 320ms var(--ease-out) both; }
   .setqa b { color: var(--fg); font-weight: 600; }
   .warn { color: var(--warn); }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -50,6 +70,26 @@
   .pill.ok { background: #173a28; color: var(--good); }
   .pill.no { background: #3a1d1d; color: var(--bad); }
   .hint { color: var(--muted); font-size: 12px; }
+
+  /* staggered table rows on first extraction */
+  tbody tr.row-in { animation: rowIn 320ms var(--ease-out) both; }
+
+  /* loading: a fast spinner reads as faster, even when the work takes the same time */
+  .busy { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 36px 4px; }
+  .busy.on { display: flex; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+  @keyframes stageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* reduced motion: keep the fades that aid comprehension, drop the movement */
+  @media (prefers-reduced-motion: reduce) {
+    .stage.enter, tbody tr.row-in { animation: fadeIn 200ms ease both; }
+    #overlay polyline { transition: none !important; }
+    button:active:not(:disabled) { transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -89,15 +129,16 @@
       <input id="split" type="checkbox" />
       <label for="split">Split shared-stroke lobes</label>
     </div>
-    <button id="rerun" disabled>Re-extract</button>
+    <button id="sample">Load sample plot</button>
+    <button id="rerun" class="ghost" disabled>Re-extract</button>
     <button id="csv" class="ghost" disabled>Download CSV</button>
-    <button id="sample" class="ghost">Load sample plot</button>
   </aside>
   <section class="viewer">
     <div id="drop">
       <strong>Drop a PDF here</strong> or click to choose
       <input id="file" type="file" accept="application/pdf" hidden />
     </div>
+    <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
     <div id="stage" class="stage" hidden>
       <canvas id="pdf"></canvas>
       <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>

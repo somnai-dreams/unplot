@@ -17,11 +17,20 @@ const priorSel = $<HTMLSelectElement>("prior"), tolInput = $<HTMLInputElement>("
 const expectedInput = $<HTMLInputElement>("expected"), orderSel = $<HTMLSelectElement>("orderby");
 const splitCb = $<HTMLInputElement>("split");
 const rerunBtn = $<HTMLButtonElement>("rerun"), csvBtn = $<HTMLButtonElement>("csv"), sampleBtn = $<HTMLButtonElement>("sample");
+const busy = $("busy");
 
 const PALETTE = ["#6ea8fe", "#57c98a", "#e0b341", "#e06c6c", "#b78bf0", "#4ec9d6"];
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let pdfData: Uint8Array | null = null;
 let renderScale = 1;
 let lastSet: CurveSet | null = null;
+
+/** Re-trigger a CSS keyframe animation by removing the class, forcing reflow, and re-adding it. */
+function replayAnim(el: HTMLElement, cls: string): void {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
 
 function buildPrior(): ShapePrior {
   const tol = parseFloat(tolInput.value);
@@ -44,9 +53,11 @@ async function renderPdf(data: Uint8Array): Promise<void> {
   overlay.setAttribute("viewBox", `0 0 ${pdfCanvas.width} ${pdfCanvas.height}`);
   overlay.setAttribute("width", String(pdfCanvas.width));
   overlay.setAttribute("height", String(pdfCanvas.height));
+  stage.classList.remove("has-result");   // new page renders at full brightness; re-dims when curves come in
   const ctx = pdfCanvas.getContext("2d")!;
   await page.render({ canvasContext: ctx, viewport }).promise;
   stage.hidden = false;
+  replayAnim(stage, "enter");   // loading a new PDF is occasional — a gentle entrance fits
 }
 
 function curveColor(c: CurveSet["curves"][number], i: number): string {
@@ -57,7 +68,9 @@ function curveColor(c: CurveSet["curves"][number], i: number): string {
   return PALETTE[i % PALETTE.length];
 }
 
-function drawOverlay(cs: CurveSet): void {
+// `animate` draws the curves in (stroke reveal, staggered) — the demo's payoff. Only on a fresh load: on
+// re-extract (a control tweak, repeated often) the overlay updates instantly so it feels responsive.
+function drawOverlay(cs: CurveSet, animate: boolean): void {
   // source coords are y-down, top-left, in PDF pt at scale 1 — so canvas px = source * renderScale.
   const NS = "http://www.w3.org/2000/svg";
   overlay.replaceChildren();
@@ -72,10 +85,23 @@ function drawOverlay(cs: CurveSet): void {
     pl.setAttribute("points", c.pointsSrc.map((p) => `${p[0] * renderScale},${p[1] * renderScale}`).join(" "));
     pl.setAttribute("fill", "none");
     pl.setAttribute("stroke", curveColor(c, i));
-    pl.setAttribute("stroke-width", "2");
-    pl.setAttribute("opacity", "0.9");
+    pl.setAttribute("stroke-width", "2.5");
+    pl.setAttribute("stroke-linecap", "round");
+    pl.setAttribute("stroke-linejoin", "round");
     overlay.appendChild(pl);
   });
+  stage.classList.add("has-result");   // dim the source render so the bright overlay reads as the result
+
+  // Reveal: wipe the bright overlay in left-to-right over the dimmed plot — a "scan" reading the curves off
+  // it. A per-curve stroke draw is invisible here: the overlay lands exactly on the identical source line
+  // underneath, so it only ever brightens. A clip sweep against the dimmed render is clearly visible. First
+  // load only; re-extract (a repeated control tweak) updates instantly.
+  if (!animate || reduceMotion) { overlay.style.clipPath = ""; return; }
+  overlay.style.transition = "none";
+  overlay.style.clipPath = "inset(0 100% 0 0)";   // hidden, then revealed from the left
+  void overlay.getBoundingClientRect();           // commit the hidden start state before transitioning
+  overlay.style.transition = "clip-path 760ms cubic-bezier(0.5, 0, 0.2, 1)";
+  overlay.style.clipPath = "inset(0 0 0 0)";
 }
 
 function peakX(c: CurveSet["curves"][number]): number {
@@ -84,7 +110,7 @@ function peakX(c: CurveSet["curves"][number]): number {
   return c.points[k]?.[0] ?? NaN;
 }
 
-function fillTable(cs: CurveSet): void {
+function fillTable(cs: CurveSet, animate: boolean): void {
   setqaEl.hidden = false;
   const w = cs.qa.warnings.length ? `<span class="warn">⚠ ${cs.qa.warnings.join("; ")}</span>` : "clean";
   setqaEl.innerHTML =
@@ -93,6 +119,7 @@ function fillTable(cs: CurveSet): void {
     `<span>crossings <b>${cs.qa.crossings}</b></span>` +
     `<span>x-axis r <b>${cs.xAxis.r.toFixed(4)}</b> · y-axis r <b>${cs.yAxis.r.toFixed(4)}</b></span>` +
     `<span>${w}</span>`;
+  if (animate && !reduceMotion) replayAnim(setqaEl, "enter");
   tableWrap.hidden = false;
   tbody.replaceChildren();
   cs.curves.forEach((c, i) => {
@@ -107,6 +134,7 @@ function fillTable(cs: CurveSet): void {
       `<td class="num">${c.qa.violation} <span class="hint">${c.qa.violationKind}</span></td>` +
       `<td>${c.qa.xMonotonic ? "yes" : "no"}</td>` +
       `<td><span class="pill ${c.qa.passed ? "ok" : "no"}">${c.qa.passed ? "pass" : "fail"}</span></td>`;
+    if (animate) { tr.classList.add("row-in"); tr.style.animationDelay = `${i * 45}ms`; }
     tbody.appendChild(tr);
   });
 }
@@ -117,7 +145,7 @@ function toCsv(cs: CurveSet): string {
   return lines.join("\n");
 }
 
-async function run(): Promise<void> {
+async function run(animate = false): Promise<void> {
   if (!pdfData) return;
   const expected = Math.round(parseFloat(expectedInput.value) || 0);
   try {
@@ -128,14 +156,15 @@ async function run(): Promise<void> {
       split: splitCb.checked,
     });
     lastSet = cs;
-    drawOverlay(cs);
-    fillTable(cs);
+    drawOverlay(cs, animate);
+    fillTable(cs, animate);
     csvBtn.disabled = false;
   } catch (e) {
     setqaEl.hidden = false;
     setqaEl.innerHTML = `<span class="warn">extract failed: ${e instanceof Error ? e.message : String(e)}</span>`;
     tableWrap.hidden = true;
     overlay.replaceChildren();
+    stage.classList.remove("has-result");   // un-dim: nothing to highlight
     csvBtn.disabled = true;
   }
 }
@@ -144,8 +173,13 @@ async function load(data: Uint8Array): Promise<void> {
   pdfData = data;
   rerunBtn.disabled = false;
   drop.hidden = true;
-  await renderPdf(data);
-  await run();
+  busy.classList.add("on");
+  try {
+    await renderPdf(data);
+    await run(true);        // first draw of a new PDF: animate the curves in
+  } finally {
+    busy.classList.remove("on");
+  }
 }
 
 // --- wiring ---
