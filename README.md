@@ -159,6 +159,12 @@ is a strong, mature tool, not an also-ran. Where GetMapped pulls ahead:
 
 Plus the categorical wins from the matrix: headless batch, a structured QA report, and MIT licensing.
 
+WPD is the **only** incumbent benchmarked here. Engauge is a desktop GUI and PlotDigitizer is login-gated, so
+neither can be batch-run — the matrix above is capability-only for them. (A scriptable PyPI digitizer was
+tried but its tracer is tuned for dense ECG-style traces, not smooth curves, so it produced no usable
+number.) WPD was chosen because it's the most-used incumbent and shares GetMapped's colour-mask + averaging
+algorithm, making it the most representative comparison.
+
 ## Install
 
 ```bash
