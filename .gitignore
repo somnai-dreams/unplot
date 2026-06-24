@@ -15,3 +15,6 @@ venv/
 # manual-comparison artifacts (regenerable / user data)
 compare/plots/
 compare/submissions/
+
+# node / TS port
+node_modules/
