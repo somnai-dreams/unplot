@@ -1,6 +1,6 @@
 /**
  * The output contract: a CurveSet is N calibrated curves + per-curve metadata + a QA/confidence report.
- * Neutral units throughout (numbers). NO film knowledge — no nm, no density, no channel names. The library
+ * Neutral units throughout (numbers). No domain knowledge: no axis-unit names, no channel names. The library
  * hands back neutral handles (`c0`, `c1`, ...) ordered deterministically; the caller maps order -> meaning.
  */
 import type { Pt } from "./curves/vectorpaths.ts";

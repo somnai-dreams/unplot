@@ -1,5 +1,5 @@
 /**
- * Pure shape-QA metrics on (x, y) point arrays — TS port of the Python `qa/shape.py`. No film knowledge,
+ * Pure shape-QA metrics on (x, y) point arrays. TS port of the Python `qa/shape.py`. No domain knowledge,
  * no I/O. Each returns a scalar violation (0 = clean) plus the x where the worst violation sits. The
  * ShapePrior wrappers turn these into Violations; extract() folds them into per-curve confidence.
  */

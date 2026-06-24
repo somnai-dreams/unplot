@@ -2,7 +2,7 @@
  * Top-level entry point — TS port of the Python `extract.py` (vector path). extract(data) -> CurveSet.
  *
  * One frame = one CurveSet. A datasheet page with sens + char + dye plots is three extract() calls. The
- * library knows nothing about film: the caller passes a ShapePrior and, after the fact, maps orderIndex ->
+ * library knows nothing about the domain: the caller passes a ShapePrior and, after the fact, maps orderIndex ->
  * channel via labeled(...). Raster ingest is not yet ported — vector only.
  */
 import { calibrateAxis } from "./axes/calibrate.ts";

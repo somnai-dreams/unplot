@@ -1,6 +1,6 @@
 """The output contract: a CurveSet is N calibrated curves + per-curve metadata + a QA/confidence report.
 
-Neutral units throughout (floats). NO film knowledge — no nm, no density, no channel names. The library
+Neutral units throughout (floats). No domain knowledge: no axis-unit names, no channel names. The library
 hands back neutral handles (`c0`, `c1`, ...) ordered deterministically; the caller maps order -> meaning.
 """
 from __future__ import annotations

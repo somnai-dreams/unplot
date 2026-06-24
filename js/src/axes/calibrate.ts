@@ -42,7 +42,7 @@ export function axisLabelAnchors(words: Word[], frame: [number, number, number, 
 
 /** Recover lost signs on a ±-symmetric (folded) axis.
  *
- * A film log-sensitivity / log-H axis labelled e.g. `2 1 0 1 2` top->bottom has true values `+2 +1 0 −1 −2`;
+ * A symmetric axis labelled e.g. `2 1 0 1 2` top->bottom has true values `+2 +1 0 −1 −2`;
  * if the minus signs were stripped the labels read as a V in |value| and the axis silently collapses. Detect
  * that V and restore alternating signs about the near-zero turning point. Which arm is negative is chosen
  * from GEOMETRY: for a y-axis the arm lower on the plot (larger source-y) is negative; for an x-axis the arm

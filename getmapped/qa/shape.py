@@ -1,4 +1,4 @@
-"""Pure shape-QA metrics on (x, y) point arrays. No film knowledge, no I/O.
+"""Pure shape-QA metrics on (x, y) point arrays. No domain knowledge, no I/O.
 
 These are the validated, ships-now half of the extraction QA. Each returns a scalar violation
 (0 = clean) plus the x where the worst violation sits. The `ShapePrior` classes wrap these into

@@ -1,6 +1,6 @@
 """Pure curve geometry: turn (possibly tangled) draw-order polylines into clean single-valued curves.
 
-No fitz, no film knowledge — numpy in, numpy out. These are the de-fan / chain / lobe-split operations
+No fitz, no domain knowledge: numpy in, numpy out. These are the de-fan / chain / lobe-split operations
 that recover individual curves when a PDF draws several lobes as one continuous pen stroke with jumps and
 returns between them.
 

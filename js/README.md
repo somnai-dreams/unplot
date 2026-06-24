@@ -1,4 +1,4 @@
-# getmapped (TypeScript port — in progress)
+# getmapped (TypeScript port)
 
 A browser-native TS port so GetMapped can run on a static page (e.g. GitHub Pages) with no Python, no server,
 no Pyodide. PDF vector geometry comes from **pdf.js** (`pdfjs-dist`, Apache-2.0); everything else is

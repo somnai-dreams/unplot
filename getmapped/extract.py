@@ -1,7 +1,7 @@
 """Top-level entry point: extract(plot) -> CurveSet.
 
 One frame = one CurveSet. A datasheet page with sens + char + dye plots is three extract() calls. The
-library knows nothing about film: the caller passes a ShapePrior and, after the fact, maps order_index ->
+library knows nothing about the domain: the caller passes a ShapePrior and, after the fact, maps order_index ->
 channel via CurveSet.labeled(...).
 """
 from __future__ import annotations

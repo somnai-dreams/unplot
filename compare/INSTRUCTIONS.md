@@ -46,6 +46,7 @@ python compare/score.py
 ```
 
 It runs GetMapped (vector + raster) on every plot and folds in whatever competitor CSVs you've added,
-reporting mean peak error (nm) and mean y-RMS per curve against ground truth. Re-run anytime you add more.
+reporting mean peak error and mean y-RMS per curve against ground truth (in x/y axis units). Re-run
+anytime you add more.
 
 (Regenerate the plots with `python compare/make_plots.py` if needed — deterministic, no randomness.)
