@@ -35,9 +35,11 @@ for (const c of cs.curves) {
 
 ## Demo
 
-A static, single-page demo (`demo/`) runs the whole thing in the browser: drop a vector PDF, it renders the
-page with pdf.js, overlays the recovered curves on the render, shows per-curve QA/confidence, and exports
-CSV. No server, no upload — the bytes never leave the page.
+A static demo (`demo/`) runs the whole thing in the browser: drop a vector PDF, it renders the page with
+pdf.js, overlays the recovered curves on the render, shows per-curve QA/confidence, and exports CSV. For
+multi-page PDFs you can page through (each page extracts independently) or "Extract all pages" for a per-page
+summary and a combined CSV. No server, no upload — the bytes never leave the page. The bundled sample is a
+3-page synthetic plot (`demo/make_sample.py`).
 
 ```
 npm run build:demo      # bundles app + pdf.js worker into demo/dist/ (GitHub Pages-ready)

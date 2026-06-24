@@ -12,5 +12,5 @@ await build({ ...common, entryPoints: ["demo/main.ts"], outfile: `${out}/app.js`
 await build({ ...common, entryPoints: ["pdfjs-dist/legacy/build/pdf.worker.mjs"], outfile: `${out}/pdf.worker.js` });
 
 copyFileSync("demo/index.html", `${out}/index.html`);
-copyFileSync("test/fixtures/three_curves.pdf", `${out}/sample.pdf`);
+copyFileSync("demo/sample.pdf", `${out}/sample.pdf`);   // multi-page synthetic sample (demo/make_sample.py)
 console.log(`\nbuilt -> ${out}/  (serve it: python3 -m http.server -d ${out})`);

@@ -18,12 +18,20 @@ const expectedInput = $<HTMLInputElement>("expected"), orderSel = $<HTMLSelectEl
 const splitCb = $<HTMLInputElement>("split");
 const rerunBtn = $<HTMLButtonElement>("rerun"), csvBtn = $<HTMLButtonElement>("csv"), sampleBtn = $<HTMLButtonElement>("sample");
 const busy = $("busy");
+const pagebar = $("pagebar"), pageLabel = $("pagelabel");
+const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
+const pagesWrap = $("pagesWrap"), pagesBody = $<HTMLElement>("pages").querySelector("tbody")!;
 
+type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 const PALETTE = ["#6ea8fe", "#57c98a", "#e0b341", "#e06c6c", "#b78bf0", "#4ec9d6"];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let pdfData: Uint8Array | null = null;
+let pdfDoc: PdfDoc | null = null;        // kept so flipping pages doesn't re-parse the file
+let numPages = 1;
+let pageIndex = 0;                        // 0-based, matches extract()'s `page` option
 let renderScale = 1;
 let lastSet: CurveSet | null = null;
+let allSets: (CurveSet | null)[] | null = null;   // populated by "Extract all pages"; null = single-page mode
 
 /** Re-trigger a CSS keyframe animation by removing the class, forcing reflow, and re-adding it. */
 function replayAnim(el: HTMLElement, cls: string): void {
@@ -42,9 +50,9 @@ function buildPrior(): ShapePrior {
   }
 }
 
-async function renderPdf(data: Uint8Array): Promise<void> {
-  const doc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise; // copy: pdf.js detaches the buffer
-  const page = await doc.getPage(1);
+async function renderPage(i: number): Promise<void> {
+  if (!pdfDoc) return;
+  const page = await pdfDoc.getPage(i + 1);   // pdf.js pages are 1-based
   const unscaled = page.getViewport({ scale: 1 });
   renderScale = Math.min(2, Math.max(0.6, 900 / unscaled.width)); // fit ~900px wide, clamp
   const viewport = page.getViewport({ scale: renderScale });
@@ -145,16 +153,20 @@ function toCsv(cs: CurveSet): string {
   return lines.join("\n");
 }
 
+function currentOpts() {
+  const expected = Math.round(parseFloat(expectedInput.value) || 0);
+  return {
+    prior: buildPrior(),
+    orderBy: orderSel.value as OrderBy,
+    expectedCurves: expected > 0 ? expected : null,
+    split: splitCb.checked,
+  };
+}
+
 async function run(animate = false): Promise<void> {
   if (!pdfData) return;
-  const expected = Math.round(parseFloat(expectedInput.value) || 0);
   try {
-    const cs = await extract(pdfData, {
-      prior: buildPrior(),
-      orderBy: orderSel.value as OrderBy,
-      expectedCurves: expected > 0 ? expected : null,
-      split: splitCb.checked,
-    });
+    const cs = await extract(pdfData, { page: pageIndex, ...currentOpts() });
     lastSet = cs;
     drawOverlay(cs, animate);
     fillTable(cs, animate);
@@ -173,19 +185,107 @@ async function load(data: Uint8Array): Promise<void> {
   pdfData = data;
   rerunBtn.disabled = false;
   drop.hidden = true;
+  clearAllPages();
   busy.classList.add("on");
   try {
-    await renderPdf(data);
+    pdfDoc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise; // copy: pdf.js detaches the buffer
+    numPages = pdfDoc.numPages;
+    pageIndex = 0;
+    updatePageUi();
+    await renderPage(0);
     await run(true);        // first draw of a new PDF: animate the curves in
   } finally {
     busy.classList.remove("on");
   }
 }
 
+function updatePageUi(): void {
+  const multi = numPages > 1;
+  pagebar.hidden = !multi;
+  extractAllBtn.hidden = !multi;
+  extractAllBtn.textContent = `Extract all ${numPages} pages`;
+  pageLabel.textContent = `Page ${pageIndex + 1} / ${numPages}`;
+  prevBtn.disabled = pageIndex <= 0;
+  nextBtn.disabled = pageIndex >= numPages - 1;
+}
+
+async function goToPage(i: number): Promise<void> {
+  const t = Math.max(0, Math.min(numPages - 1, i));
+  if (t === pageIndex || !pdfDoc) return;
+  pageIndex = t;
+  updatePageUi();
+  highlightPageRow();
+  await renderPage(pageIndex);
+  await run(true);          // a new page is a new result — animate it in
+}
+
+/** Reset multi-page state (called on a new file, and when options change so the summary isn't stale). */
+function clearAllPages(): void {
+  allSets = null;
+  pagesWrap.hidden = true;
+  pagesBody.replaceChildren();
+}
+
+/** Extract every page in one go: a per-page summary table + a combined all-pages CSV. */
+async function extractAll(): Promise<void> {
+  if (!pdfData) return;
+  busy.classList.add("on");
+  try {
+    const opts = currentOpts();
+    const sets: (CurveSet | null)[] = [];
+    for (let i = 0; i < numPages; i++) {
+      try { sets.push(await extract(pdfData, { page: i, ...opts })); }
+      catch { sets.push(null); }   // a page with no curve paths -> no result for that page
+    }
+    allSets = sets;
+    renderPagesSummary(sets);
+    csvBtn.disabled = false;
+  } finally {
+    busy.classList.remove("on");
+  }
+}
+
+function renderPagesSummary(sets: (CurveSet | null)[]): void {
+  pagesWrap.hidden = false;
+  pagesBody.replaceChildren();
+  sets.forEach((cs, i) => {
+    const tr = document.createElement("tr");
+    if (i === pageIndex) tr.classList.add("active");
+    if (!cs) {
+      tr.innerHTML = `<td class="num">${i + 1}</td><td class="num">0</td><td>—</td><td>—</td><td class="hint">no curves found</td>`;
+    } else {
+      const conf = cs.qa.confidence;
+      const confColor = conf > 0.9 ? "var(--good)" : conf > 0.6 ? "var(--warn)" : "var(--bad)";
+      const notes = cs.qa.warnings.length ? `<span class="warn">⚠ ${cs.qa.warnings.length}</span>` : "clean";
+      tr.innerHTML =
+        `<td class="num">${i + 1}</td><td class="num">${cs.qa.nCurves}</td>` +
+        `<td class="num" style="color:${confColor}">${conf}</td><td class="num">${cs.qa.crossings}</td><td>${notes}</td>`;
+    }
+    tr.addEventListener("click", () => void goToPage(i));
+    pagesBody.appendChild(tr);
+  });
+}
+
+function highlightPageRow(): void {
+  [...pagesBody.children].forEach((tr, i) => tr.classList.toggle("active", i === pageIndex));
+}
+
+function toCsvAll(sets: (CurveSet | null)[]): string {
+  const lines = ["page,curve_id,order_index,x,y"];
+  sets.forEach((cs, i) => {
+    if (cs) for (const c of cs.curves) for (const [x, y] of c.points) lines.push(`${i + 1},${c.id},${c.orderIndex},${x},${y}`);
+  });
+  return lines.join("\n");
+}
+
 // --- wiring ---
-priorSel.addEventListener("change", () => { tolWrap.hidden = priorSel.value === "free"; void run(); });
-[tolInput, expectedInput, orderSel, splitCb].forEach((el) => el.addEventListener("change", () => void run()));
+// changing options re-extracts the current page; any all-pages summary is now stale, so drop it.
+priorSel.addEventListener("change", () => { tolWrap.hidden = priorSel.value === "free"; clearAllPages(); void run(); });
+[tolInput, expectedInput, orderSel, splitCb].forEach((el) => el.addEventListener("change", () => { clearAllPages(); void run(); }));
 rerunBtn.addEventListener("click", () => void run());
+prevBtn.addEventListener("click", () => void goToPage(pageIndex - 1));
+nextBtn.addEventListener("click", () => void goToPage(pageIndex + 1));
+extractAllBtn.addEventListener("click", () => void extractAll());
 
 drop.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", async () => {
@@ -201,13 +301,15 @@ drop.addEventListener("drop", async (e) => {
 });
 sampleBtn.addEventListener("click", async () => {
   const buf = await (await fetch("./sample.pdf")).arrayBuffer();
-  expectedInput.value = "3";
-  await load(new Uint8Array(buf));
+  await load(new Uint8Array(buf));   // auto curve count: the sample is colour-keyed, separated by style
 });
 csvBtn.addEventListener("click", () => {
-  if (!lastSet) return;
-  const blob = new Blob([toCsv(lastSet)], { type: "text/csv" });
+  const csv = allSets ? toCsvAll(allSets) : lastSet ? toCsv(lastSet) : null;
+  if (!csv) return;
+  const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = "getmapped-curves.csv"; a.click();
+  a.href = URL.createObjectURL(blob);
+  a.download = allSets ? "getmapped-all-pages.csv" : "getmapped-curves.csv";
+  a.click();
   URL.revokeObjectURL(a.href);
 });

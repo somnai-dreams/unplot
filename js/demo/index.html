@@ -70,6 +70,14 @@
   .pill.ok { background: #173a28; color: var(--good); }
   .pill.no { background: #3a1d1d; color: var(--bad); }
   .hint { color: var(--muted); font-size: 12px; }
+  .pagebar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
+  .pagenav { padding: 3px 12px; font-size: 16px; line-height: 1.25; font-weight: 600; }
+  #pagesWrap { margin: 6px 0 18px; }
+  .subhead { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 7px; }
+  .subhead .hint { text-transform: none; letter-spacing: 0; }
+  #pages tbody tr { cursor: pointer; transition: background-color 120ms var(--ease-out); }
+  #pages tbody tr.active { background: #1a2230; }
+  @media (hover: hover) and (pointer: fine) { #pages tbody tr:hover { background: #20242c; } }
 
   /* staggered table rows on first extraction */
   tbody tr.row-in { animation: rowIn 320ms var(--ease-out) both; }
@@ -131,6 +139,7 @@
     </div>
     <button id="sample">Load sample plot</button>
     <button id="rerun" class="ghost" disabled>Re-extract</button>
+    <button id="extractall" class="ghost" hidden>Extract all pages</button>
     <button id="csv" class="ghost" disabled>Download CSV</button>
   </aside>
   <section class="viewer">
@@ -139,11 +148,22 @@
       <input id="file" type="file" accept="application/pdf" hidden />
     </div>
     <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
+    <div id="pagebar" class="pagebar" hidden>
+      <button id="prev" class="ghost pagenav" aria-label="Previous page">‹</button>
+      <span id="pagelabel">Page 1 / 1</span>
+      <button id="next" class="ghost pagenav" aria-label="Next page">›</button>
+    </div>
     <div id="stage" class="stage" hidden>
       <canvas id="pdf"></canvas>
       <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
     <div id="setqa" class="setqa" hidden></div>
+    <div id="pagesWrap" hidden>
+      <div class="subhead">All pages <span class="hint">— click a row to view</span></div>
+      <table id="pages"><thead><tr>
+        <th>page</th><th>curves</th><th>confidence</th><th>crossings</th><th>notes</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
     <div id="tableWrap" hidden>
       <table id="qa"><thead><tr>
         <th>curve</th><th>n</th><th>peak-x</th><th>conf</th><th>violation</th><th>x-mono</th><th>passed</th>
