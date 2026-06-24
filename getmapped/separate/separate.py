@@ -70,7 +70,7 @@ def separate(rawpaths: list[RawPath], *, expected_curves: int | None = None,
         cands = _by_style(rawpaths)
     else:
         cands = _by_defan(rawpaths, split, d["min_seg"], d["min_curve"], d["min_path_segs"])
-    cands.sort(key=lambda c: -(c[2][:, 1].max() - c[2][:, 1].min()))   # most prominent (tallest) first
-    if expected_curves:
-        cands = cands[:expected_curves]
+    # NOTE: do NOT truncate to expected_curves here. Confidence isn't known until the curves are calibrated +
+    # scored against the prior (in extract._build_curves), and selecting by raw amplitude lets a tall malformed
+    # fragment evict a real lobe. Return all candidates; the confidence-aware selection happens downstream.
     return cands, method

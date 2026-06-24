@@ -63,18 +63,29 @@ def extract(source: str | NDArray, *, page: int = 0,
     return _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expected_curves)
 
 
-def _build_curves(cands, x_axis, y_axis, order_by, prior, method_label):
+def _amplitude(points_data: NDArray) -> float:
+    return float(points_data[:, 1].max() - points_data[:, 1].min())
+
+
+def _build_curves(cands, x_axis, y_axis, order_by, prior, method_label, expected_curves=None):
     built = []
     for dash, color, P_src in cands:
         pdata, psrc = _finalize(P_src, x_axis, y_axis)
         if len(pdata) >= 2:
-            built.append((dash, color, pdata, psrc))
+            built.append((dash, color, pdata, psrc, curve_qa(pdata, prior)))
+    # Confidence-aware selection: keep the `expected_curves` best by confidence * amplitude. A real curve scores
+    # high on BOTH; a tall malformed fragment has confidence ~0, and a tiny degenerate stub has amplitude ~0, so
+    # either failure mode scores ~0 and can't displace a genuine lobe. (Selecting by amplitude alone was the bug:
+    # the count looked right but a real high-confidence lobe was dropped for a taller malformed fragment.)
+    if expected_curves and len(built) > expected_curves:
+        built.sort(key=lambda t: -(t[4].confidence * _amplitude(t[2])))
+        built = built[:expected_curves]
     built.sort(key=lambda t: _order_key(t[2], order_by))
     curves = []
-    for k, (dash, color, pdata, psrc) in enumerate(built):
+    for k, (dash, color, pdata, psrc, qa) in enumerate(built):
         style = CurveStyle(dash=dash, color=tuple(color) if color else None, width=None)
         curves.append(Curve(id=f"c{k}", order_index=k, style=style, points=pdata,
-                            points_src=psrc, method=method_label, qa=curve_qa(pdata, prior)))
+                            points_src=psrc, method=method_label, qa=qa))
     return tuple(curves)
 
 
@@ -89,7 +100,7 @@ def _extract_vector(path, page, frame, x_axis, y_axis, prior, order_by, expected
     raw = iov.paths_in_frame(vp, frame, min_segs)
     cands, method = separate(raw, expected_curves=expected_curves, split=split, defan=defan)
     label = "vector-path" if method == "style" else "vector-defan-chain"
-    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, label)
+    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, label, expected_curves)
 
     warnings: list[str] = []
     if abs(x_cal.r) < 0.999 or abs(y_cal.r) < 0.999:
@@ -140,10 +151,9 @@ def _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expect
     else:
         frags = rp.raster_fragments(cols, left, right)
         chained = rp.chain_fragments(frags, prior=prior)
-        chained.sort(key=lambda c: -(c[:, 0].max() - c[:, 0].min()))   # widest span first
-        cands, method = [(None, None, c) for c in chained[:want]], "raster-march"
+        cands, method = [(None, None, c) for c in chained], "raster-march"   # selection is confidence-aware below
 
-    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, method)
+    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, method, expected_curves)
     warnings: list[str] = []
     if count_crossings(curves) > 0:
         warnings.append("raster: recovered curves cross — separation may have tangled them at a crossing; "

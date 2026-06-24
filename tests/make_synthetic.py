@@ -138,6 +138,78 @@ def build_folded_axis(path: str, minus_style: str = "stripped") -> dict:
     return {"frame": fr, "y_left": 1.5, "y_right": -1.5}
 
 
+def build_skirted_crossing(path: str) -> dict:
+    """Three MONO (single-colour) asymmetric lobes — sharp rise, long descending skirt — that overlap heavily
+    and cross. This is the real datasheet shape (spectral-sensitivity / dye-density) and the one that trips
+    amplitude-based curve selection: de-fan/chain leaves a tall peak-to-skirt fragment that out-ranks a real
+    lobe. Single colour forces the de-fan path (no colour separation). Peaks ~440/550/640."""
+    fr = (60.0, 40.0, 360.0, 240.0)
+    x0, y0, x1, y1 = fr
+
+    def x2px(x):
+        return x0 + (x - 400.0) / 300.0 * (x1 - x0)
+
+    def v2py(v):
+        return y1 - v / 2.0 * (y1 - y0)
+
+    doc = fitz.open()
+    pg = doc.new_page(width=420, height=300)
+    box = [fitz.Point(x0, y0), fitz.Point(x1, y0), fitz.Point(x1, y1), fitz.Point(x0, y1), fitz.Point(x0, y0)]
+    sh = pg.new_shape(); sh.draw_polyline(box); sh.finish(color=(0, 0, 0), width=0.8); sh.commit()
+    for t in (400, 500, 600, 700):
+        pg.insert_text(fitz.Point(x2px(t) - 6, y1 + 12), str(t), fontsize=8)
+    for t in (0, 1, 2):
+        pg.insert_text(fitz.Point(x0 - 16, v2py(t) + 3), str(t), fontsize=8)
+    nm = np.arange(400.0, 700.001, 2.0)
+    peaks = [440.0, 550.0, 640.0]
+    amps = [1.7, 1.7, 1.6]
+    for peak, amp in zip(peaks, amps):
+        rise = np.exp(-0.5 * ((nm - peak) / 18.0) ** 2)        # sharp rise
+        fall = np.exp(-0.5 * ((nm - peak) / 70.0) ** 2)        # long, heavily-overlapping skirt
+        v = amp * np.where(nm < peak, rise, fall)
+        pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(nm, v)]
+        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.4, closePath=False); sh.commit()
+    doc.save(path); doc.close()
+    return {"frame": fr, "peaks": peaks}
+
+
+def build_lobes_with_decoy(path: str) -> dict:
+    """Three real mono lobes (440/550/640, well-formed -> high confidence) plus a TALL malformed 'W' decoy near
+    the left edge (two peaks + a deep valley -> flank violation -> confidence ~0), drawn TALLER than the lobes.
+    Amplitude-only selection ranks the decoy first and drops a real lobe; confidence-aware selection must keep
+    the three lobes and reject the decoy."""
+    fr = (60.0, 40.0, 360.0, 240.0)
+    x0, y0, x1, y1 = fr
+
+    def x2px(x):
+        return x0 + (x - 400.0) / 300.0 * (x1 - x0)
+
+    def v2py(v):
+        return y1 - v / 2.0 * (y1 - y0)
+
+    doc = fitz.open()
+    pg = doc.new_page(width=420, height=300)
+    box = [fitz.Point(x0, y0), fitz.Point(x1, y0), fitz.Point(x1, y1), fitz.Point(x0, y1), fitz.Point(x0, y0)]
+    sh = pg.new_shape(); sh.draw_polyline(box); sh.finish(color=(0, 0, 0), width=0.8); sh.commit()
+    for t in (400, 500, 600, 700):
+        pg.insert_text(fitz.Point(x2px(t) - 6, y1 + 12), str(t), fontsize=8)
+    for t in (0, 1, 2):
+        pg.insert_text(fitz.Point(x0 - 16, v2py(t) + 3), str(t), fontsize=8)
+    nm = np.arange(400.0, 700.001, 2.0)
+    for peak in (440.0, 550.0, 640.0):
+        v = 1.6 * np.exp(-0.5 * ((nm - peak) / 22.0) ** 2)
+        pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(nm, v)]
+        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.4, closePath=False); sh.commit()
+    # tall malformed decoy: a densely-sampled zigzag (multiple peaks/valleys -> flank violation -> conf ~0),
+    # amplitude 1.8 > the lobes' 1.6, monotone in x so it survives de-fan as one candidate.
+    wnm = np.arange(405.0, 444.0, 1.5)
+    wv = 1.0 + 0.9 * np.sin((wnm - 405.0) * np.pi / 10.0)
+    pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(wnm, wv)]
+    sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.4, closePath=False); sh.commit()
+    doc.save(path); doc.close()
+    return {"frame": fr, "peaks": [440.0, 550.0, 640.0]}
+
+
 if __name__ == "__main__":
     import sys
     meta = build(sys.argv[1] if len(sys.argv) > 1 else "/tmp/getmapped_synth.pdf")
