@@ -27,14 +27,15 @@ def v2py(v: float) -> float:
     return FRAME[3] - (v - YR[0]) / (YR[1] - YR[0]) * (FRAME[3] - FRAME[1])
 
 
-def make_pdf(peaks, sigma, amp, path):
+def make_pdf(peaks, sigma, amp, path, mono=False):
     doc = fitz.open()
     pg = doc.new_page(width=420, height=300)
     nm = np.arange(400.0, 700.01, 2.0)
     for k, (pk, a, s) in enumerate(zip(peaks, amp, sigma)):
         v = a * np.exp(-0.5 * ((nm - pk) / s) ** 2)
         pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(nm, v)]
-        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=COLORS[k % 4], width=1.4); sh.commit()
+        col = (0, 0, 0) if mono else COLORS[k % 4]
+        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=col, width=1.4); sh.commit()
     for lbl in (400, 500, 600, 700):
         pg.insert_text(fitz.Point(x2px(lbl) - 6, FRAME[3] + 12), str(lbl), fontsize=8)
     for lbl in (0, 1, 2):
@@ -73,10 +74,10 @@ TIERS = [
     ("vector · 3 separated", dict(ingest="vector", n=3, mode="separated")),
     ("vector · 3 crossing", dict(ingest="vector", n=3, mode="crossing")),
     ("vector · 4 crossing", dict(ingest="vector", n=4, mode="crossing")),
-    ("raster · 3 separated · clean", dict(ingest="raster", n=3, mode="separated", dpi=200, noise=0)),
-    ("raster · 3 crossing · clean", dict(ingest="raster", n=3, mode="crossing", dpi=200, noise=0)),
-    ("raster · 3 separated · noisy", dict(ingest="raster", n=3, mode="separated", dpi=200, noise=18)),
-    ("raster · 3 occluded", dict(ingest="raster", n=3, mode="occluded", dpi=200, noise=0)),
+    ("raster colour · 3 crossing", dict(ingest="raster", n=3, mode="crossing", dpi=200, noise=0, mono=False)),
+    ("raster colour · 3 crossing · noisy", dict(ingest="raster", n=3, mode="crossing", dpi=200, noise=18, mono=False)),
+    ("raster mono · 3 crossing", dict(ingest="raster", n=3, mode="crossing", dpi=200, noise=0, mono=True)),
+    ("raster mono · 3 occluded", dict(ingest="raster", n=3, mode="occluded", dpi=200, noise=0, mono=True)),
 ]
 K = 20
 
@@ -85,7 +86,7 @@ def run_tier(cfg, rng, tmp):
     errs = []
     for t in range(K):
         peaks, sigma, amp = gen_peaks(cfg["n"], cfg["mode"], rng)
-        p = os.path.join(tmp, f"p{t}.pdf"); make_pdf(peaks, sigma, amp, p)
+        p = os.path.join(tmp, f"p{t}.pdf"); make_pdf(peaks, sigma, amp, p, cfg.get("mono", False))
         if cfg["ingest"] == "vector":
             cs = extract(p, frame=FRAME, prior=Lobe(0.08), expected_curves=cfg["n"], order_by="peak-x")
         else:

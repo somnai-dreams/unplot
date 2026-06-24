@@ -62,6 +62,49 @@ def ink_xy(mask: NDArray) -> NDArray:
     return np.column_stack([xs, ys]).astype(float)
 
 
+def color_curves(img: NDArray, gray: NDArray, frame: Frame, n: int,
+                 dark: int = 160, sat: int = 45) -> list[NDArray] | None:
+    """Separate colour-coded curves by hue: cluster the saturated ink pixels into `n` colour groups
+    (cv2.kmeans on RGB), then take each group's per-column median y as a curve (source coords).
+
+    Different colours never merge, so crossings and shared baselines can't tangle — this is the robust path
+    for plots that colour-code their curves. Greyscale/black ink (frame, axis, labels) is excluded by the
+    saturation gate. Returns `n` curves, or None if the plot isn't colour-keyed (too little saturated ink).
+    """
+    left, top, right, bottom = frame
+    region = img[top:bottom + 1, left:right + 1].astype(np.int32)
+    g = gray[top:bottom + 1, left:right + 1]
+    saturation = region.max(2) - region.min(2)
+    ys, xs = np.where((g < dark) & (saturation > sat))
+    if len(xs) < n * 30:
+        return None
+    samples = region[ys, xs].astype(np.float32)
+    crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+    _, labels, _ = cv2.kmeans(samples, n, None, crit, 5, cv2.KMEANS_PP_CENTERS)
+    labels = labels.ravel()
+    out: list[NDArray] = []
+    for k in range(n):
+        m = labels == k
+        if int(m.sum()) < 10:
+            continue
+        cx, cy = xs[m] + left, ys[m] + top
+        order = np.argsort(cx, kind="stable")
+        cx, cy = cx[order], cy[order]
+        uniq, first = np.unique(cx, return_index=True)
+        yv = np.array([np.median(s) for s in np.split(cy, first[1:])], float)
+        yv = _rolling_median(yv, 5)                 # denoise the per-column trace (helps mis-clustered/noisy pixels)
+        if len(uniq) >= 8:
+            out.append(np.column_stack([uniq.astype(float), yv]))
+    return out if len(out) == n else None
+
+
+def _rolling_median(y: NDArray, w: int = 5) -> NDArray:
+    if len(y) < w:
+        return y
+    h = w // 2
+    return np.array([np.median(y[max(0, i - h): i + h + 1]) for i in range(len(y))], float)
+
+
 def raster_fragments(cols: dict[int, list[int]], x_lo: int, x_hi: int,
                      max_dy: float = 8.0) -> list[NDArray]:
     """Trace connected run-fragments that BREAK cleanly at every merge/split (i.e. at crossings).

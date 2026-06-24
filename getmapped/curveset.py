@@ -11,7 +11,7 @@ from typing import Literal
 from numpy.typing import NDArray
 
 Ingest = Literal["vector", "raster"]
-Method = Literal["vector-path", "vector-defan-chain", "raster-march"]
+Method = Literal["vector-path", "vector-defan-chain", "raster-march", "raster-color"]
 OrderBy = Literal["peak-x", "mean-y", "first-x"]
 Dash = Literal["solid", "dashed", "dashdot"]
 

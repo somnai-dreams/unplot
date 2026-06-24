@@ -131,15 +131,19 @@ def _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expect
     mask = rp.ink_mask(gray, ifr, dark=dark)
     cols = rp.column_centres(mask, ifr)
 
-    # fragment-then-chain: break runs into crossing-free fragments, then let the prior pick which fragment
-    # continues which at each crossing (neutral prior -> nearest-endpoint chaining).
+    # colour-keyed plots: separate curves by hue (no cross-curve merging). Falls back to the greyscale
+    # fragment-then-chain (prior picks continuations at crossings) for mono/black plots.
     want = expected_curves or 1
-    frags = rp.raster_fragments(cols, left, right)
-    chained = rp.chain_fragments(frags, prior=prior)
-    chained.sort(key=lambda c: -(c[:, 0].max() - c[:, 0].min()))   # widest span first
-    cands = [(None, None, c) for c in chained[:want]]
+    color = rp.color_curves(img, gray, ifr, want) if want > 1 else None
+    if color is not None:
+        cands, method = [(None, None, c) for c in color], "raster-color"
+    else:
+        frags = rp.raster_fragments(cols, left, right)
+        chained = rp.chain_fragments(frags, prior=prior)
+        chained.sort(key=lambda c: -(c[:, 0].max() - c[:, 0].min()))   # widest span first
+        cands, method = [(None, None, c) for c in chained[:want]], "raster-march"
 
-    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, "raster-march")
+    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, method)
     warnings: list[str] = []
     if count_crossings(curves) > 0:
         warnings.append("raster: recovered curves cross — separation may have tangled them at a crossing; "

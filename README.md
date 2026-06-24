@@ -10,8 +10,8 @@ GetMapped trades that interactivity for two things those tools don't do, so it c
   datasheets), GetMapped reads the *exact* geometry out of the file — no rasterizing, no pixel re-detection,
   no manual clicking. The numbers you get are the numbers that were drawn.
 - **Automatic multi-curve crossing separation.** Where several curves overlap and cross, GetMapped keeps them
-  apart — by stroke style/colour for vector paths, and by de-fanning and re-chaining continuous pen strokes
-  that trace several lobes at once. No tangle at the crossings.
+  apart — by stroke style/colour for vector paths, by hue for colour-coded raster images, and by de-fanning
+  and re-chaining continuous pen strokes that trace several lobes at once. No tangle at the crossings.
 
 And it treats QA as a first-class output, not an afterthought: every `CurveSet` carries a per-curve and
 set-level **confidence report** (shape-prior violations, calibration fit quality, coverage gaps, crossings).
@@ -68,11 +68,10 @@ the tracer swap curves). Priors are plain dataclasses — write your own by impl
 **Not yet — "future / contributions welcome":**
 - **Log-spaced axes.** Calibration is linear pt→value. Axes whose *values* are log quantities (log exposure,
   log sensitivity) work fine because they are drawn linearly; genuinely log-*spaced* axes are not handled.
-- **Dense raster crossings.** Raster ingest breaks curves into crossing-free fragments and re-chains them
-  under the prior, which separates clean crossings (two curves crossing at a point) well. Many curves
-  overlapping over a *range* (e.g. a tight 3-lobe mono plot) are not fully solved — separation degrades and
-  the QA reports it (low confidence, flagged curves). Vector ingest separates crossings cleanly and is the
-  better route when geometry is available.
+- **Mono raster crossings.** When a raster plot colour-codes its curves, GetMapped separates them by hue, so
+  crossings and shared baselines don't tangle. When curves share a single colour and overlap over a *range*
+  (a tight mono multi-lobe plot), the greyscale tracer can mis-assign — separation degrades and the QA
+  reports it (low confidence, flagged curves). Vector ingest, or a colour-coded source, is the better route.
 - Broken/partial axis boxes, dashed lines mistaken for separate curves, legends drawn over curves, exotic
   scales, and automatic frame detection for raster scans.
 
@@ -102,15 +101,17 @@ Absolute accuracy on synthetic ground truth — peak error per curve, 20 randomi
 |vector · 3 separated|0.5 nm|1.3 nm|
 |vector · 3 crossing|0.9 nm|1.4 nm|
 |vector · 4 crossing|0.6 nm|1.5 nm|
-|raster · 3 separated (clean)|1.3 nm|48 nm|
-|raster · 3 crossing (clean)|1.3 nm|41 nm|
-|raster · 3 separated (noisy)|1.4 nm|50 nm|
-|raster · 3 occluded|1.6 nm|44 nm|
+|raster colour · 3 crossing|1.3 nm|2.6 nm|
+|raster colour · 3 crossing (noisy)|1.3 nm|2.1 nm|
+|raster mono · 3 crossing|1.2 nm|45 nm|
+|raster mono · 3 occluded|1.4 nm|50 nm|
 
-Reading it: **vector extraction is essentially exact** (sub-nm, tight, unaffected by crossings or curve
-count — it's reading drawn geometry). **Raster is typically ~1 nm but has a heavy tail** (p90 in the tens of
-nm) on hard cases — peak detection occasionally fails on a crossing, an occluded lobe, or noise. That tail is
-exactly what the QA report surfaces, so you can drop low-confidence curves instead of trusting them.
+Reading it: **vector is essentially exact** (sub-nm, tight, unaffected by crossings or curve count — it reads
+drawn geometry). **Colour-coded raster is tight too** (p90 ~2–3 nm) — curves are separated by hue, so
+crossings and shared baselines don't tangle. **Mono (single-colour) raster keeps a heavy tail** (p90 ~45–50
+nm) on crossings and occluded lobes — there's no colour to separate by, so the greyscale tracer can
+mis-assign. That tail is exactly what the QA report surfaces, so you can drop low-confidence curves instead
+of trusting them.
 
 ## How it compares
 
@@ -125,7 +126,7 @@ automation, not interactive correction.
 |reads vector-PDF geometry (no rasterizing)|yes|no (image)|no (image)|no (image)|
 |automatic curve tracing|yes|yes|yes|yes|
 |automatic axis calibration|yes (vector; raster needs anchors)|no (click axes)|no (click axes)|no (click axes)|
-|multi-curve crossing separation|pluggable shape prior|by colour / layers|guided point-match|manual / auto|
+|multi-curve crossing separation|by hue, or a pluggable shape prior|by colour / layers|guided point-match|manual / auto|
 |structured QA / confidence output|yes|no|no|no|
 |headless library / scriptable batch|yes (`pip install`)|no (web app)|no (desktop GUI)|no (web/desktop)|
 |other chart types (polar, bar, …)|no (line/curve only)|yes|yes|yes|
