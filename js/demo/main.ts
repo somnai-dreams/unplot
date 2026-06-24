@@ -21,6 +21,7 @@ const busy = $("busy");
 const pagebar = $("pagebar"), pageLabel = $("pagelabel");
 const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
 const pagesWrap = $("pagesWrap"), pagesBody = $<HTMLElement>("pages").querySelector("tbody")!;
+const selbox = $("selbox"), regionbar = $("regionbar"), regionmsg = $("regionmsg"), wholepageBtn = $<HTMLButtonElement>("wholepage");
 
 type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 const PALETTE = ["#6ea8fe", "#57c98a", "#e0b341", "#e06c6c", "#b78bf0", "#4ec9d6"];
@@ -32,6 +33,8 @@ let pageIndex = 0;                        // 0-based, matches extract()'s `page`
 let renderScale = 1;
 let lastSet: CurveSet | null = null;
 let allSets: (CurveSet | null)[] | null = null;   // populated by "Extract all pages"; null = single-page mode
+let frameSel: [number, number, number, number] | null = null;   // selected ROI in source pt; null = auto-frame
+let selecting = false, dragged = false, selStart: [number, number] | null = null;
 
 /** Re-trigger a CSS keyframe animation by removing the class, forcing reflow, and re-adding it. */
 function replayAnim(el: HTMLElement, cls: string): void {
@@ -166,7 +169,7 @@ function currentOpts() {
 async function run(animate = false): Promise<void> {
   if (!pdfData) return;
   try {
-    const cs = await extract(pdfData, { page: pageIndex, ...currentOpts() });
+    const cs = await extract(pdfData, { page: pageIndex, frame: frameSel ?? undefined, ...currentOpts() });
     lastSet = cs;
     drawOverlay(cs, animate);
     fillTable(cs, animate);
@@ -191,9 +194,11 @@ async function load(data: Uint8Array): Promise<void> {
     pdfDoc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise; // copy: pdf.js detaches the buffer
     numPages = pdfDoc.numPages;
     pageIndex = 0;
+    frameSel = null; selbox.hidden = true;
     updatePageUi();
     await renderPage(0);
     await run(true);        // first draw of a new PDF: animate the curves in
+    updateRegionBar();
   } finally {
     busy.classList.remove("on");
   }
@@ -213,10 +218,12 @@ async function goToPage(i: number): Promise<void> {
   const t = Math.max(0, Math.min(numPages - 1, i));
   if (t === pageIndex || !pdfDoc) return;
   pageIndex = t;
+  frameSel = null; selbox.hidden = true;   // a region is page-specific; reset on page change
   updatePageUi();
   highlightPageRow();
   await renderPage(pageIndex);
   await run(true);          // a new page is a new result — animate it in
+  updateRegionBar();
 }
 
 /** Reset multi-page state (called on a new file, and when options change so the summary isn't stale). */
@@ -234,7 +241,7 @@ async function extractAll(): Promise<void> {
     const opts = currentOpts();
     const sets: (CurveSet | null)[] = [];
     for (let i = 0; i < numPages; i++) {
-      try { sets.push(await extract(pdfData, { page: i, ...opts })); }
+      try { sets.push(await extract(pdfData, { page: i, frame: frameSel ?? undefined, ...opts })); }
       catch { sets.push(null); }   // a page with no curve paths -> no result for that page
     }
     allSets = sets;
@@ -277,6 +284,63 @@ function toCsvAll(sets: (CurveSet | null)[]): string {
   });
   return lines.join("\n");
 }
+
+// --- region select: drag a box on the plot to constrain extraction to one plot (multi-plot datasheet pages,
+// where the auto-frame would otherwise span every plot on the page and tangle them together).
+function localXY(e: PointerEvent): [number, number] {
+  const r = stage.getBoundingClientRect();
+  return [
+    Math.max(0, Math.min(pdfCanvas.width, e.clientX - r.left)),
+    Math.max(0, Math.min(pdfCanvas.height, e.clientY - r.top)),
+  ];
+}
+
+function updateRegionBar(): void {
+  regionbar.hidden = stage.hidden;
+  if (frameSel) {
+    regionmsg.innerHTML = `Extracting a <b style="color:var(--fg)">selected region</b> — drag again to reselect.`;
+    wholepageBtn.hidden = false;
+  } else {
+    regionmsg.innerHTML = `<span class="hint">Multi-plot page? Drag a box around one plot's axes (tick labels just outside) to extract only that plot.</span>`;
+    wholepageBtn.hidden = true;
+  }
+}
+
+stage.addEventListener("pointerdown", (e) => {
+  if (!pdfDoc || stage.hidden) return;
+  selecting = true; dragged = false; selStart = localXY(e);
+  try { stage.setPointerCapture(e.pointerId); } catch { /* pointer may not be capturable */ }
+});
+stage.addEventListener("pointermove", (e) => {
+  if (!selecting || !selStart) return;
+  const [x, y] = localXY(e);
+  if (!dragged && Math.abs(x - selStart[0]) < 3 && Math.abs(y - selStart[1]) < 3) return;
+  dragged = true;
+  selbox.hidden = false;
+  selbox.style.left = `${Math.min(selStart[0], x)}px`;
+  selbox.style.top = `${Math.min(selStart[1], y)}px`;
+  selbox.style.width = `${Math.abs(x - selStart[0])}px`;
+  selbox.style.height = `${Math.abs(y - selStart[1])}px`;
+});
+stage.addEventListener("pointerup", (e) => {
+  if (!selecting) return;
+  selecting = false;
+  if (!dragged || !selStart) { selStart = null; return; }   // a click, not a drag — leave the current region as-is
+  const [x, y] = localXY(e);
+  const x0 = Math.min(selStart[0], x), y0 = Math.min(selStart[1], y);
+  const x1 = Math.max(selStart[0], x), y1 = Math.max(selStart[1], y);
+  selStart = null;
+  if (x1 - x0 < 8 || y1 - y0 < 8) { selbox.hidden = true; return; }   // too small to be a real region
+  frameSel = [x0 / renderScale, y0 / renderScale, x1 / renderScale, y1 / renderScale];   // canvas px -> source pt
+  clearAllPages();        // a region changes results; any all-pages summary is stale
+  updateRegionBar();
+  void run(true);
+});
+wholepageBtn.addEventListener("click", () => {
+  frameSel = null; selbox.hidden = true;
+  updateRegionBar();
+  void run(true);
+});
 
 // --- wiring ---
 // changing options re-extracts the current page; any all-pages summary is now stale, so drop it.

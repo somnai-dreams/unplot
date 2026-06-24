@@ -49,8 +49,11 @@
   }
   #drop.hot { border-color: var(--accent); color: var(--fg); background: #1a2230; }
   @media (hover: hover) and (pointer: fine) { #drop:hover { border-color: #3a4150; color: var(--fg); } }
-  .stage { position: relative; display: inline-block; line-height: 0; }
+  .stage { position: relative; display: inline-block; line-height: 0; cursor: crosshair; touch-action: none; }
   .stage.enter { animation: stageIn 360ms var(--ease-out) both; }
+  .selbox { position: absolute; border: 1.5px solid var(--accent); background: rgba(110, 168, 254, .14); border-radius: 2px; pointer-events: none; }
+  .regionbar { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
+  .small { padding: 3px 10px; font-size: 12px; font-weight: 500; }
   .stage canvas { border: 1px solid var(--line); border-radius: 6px; display: block; transition: opacity 360ms var(--ease-out); }
   /* once curves are recovered, dim the source render so the extracted overlay reads as the hero (and you can
      see it trace on); the dimmed original stays visible behind, proving the overlay lands on it. */
@@ -156,6 +159,11 @@
     <div id="stage" class="stage" hidden>
       <canvas id="pdf"></canvas>
       <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="selbox" class="selbox" hidden></div>
+    </div>
+    <div id="regionbar" class="regionbar" hidden>
+      <span id="regionmsg"></span>
+      <button id="wholepage" class="ghost small" hidden>Use whole page</button>
     </div>
     <div id="setqa" class="setqa" hidden></div>
     <div id="pagesWrap" hidden>
