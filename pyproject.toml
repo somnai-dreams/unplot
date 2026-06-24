@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "getmapped"
+version = "0.0.1"
+description = "Vector-PDF-native plot extraction with automatic multi-curve crossing separation and a first-class QA report."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Max Ingham" }]
+keywords = ["plot", "digitizer", "pdf", "vector", "curve", "extraction", "datasheet"]
+dependencies = [
+  "numpy>=1.24",
+  "pymupdf>=1.23",   # fitz: vector path geometry + numeric text labels
+]
+
+[project.optional-dependencies]
+raster = [
+  "opencv-python-headless>=4.8",  # morphology + connected components for the raster fallback
+  "pillow>=10.0",
+]
+test = ["pytest>=7.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["getmapped"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
