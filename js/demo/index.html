@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GetMapped — browser demo</title>
+<script>window.__errs=[];addEventListener("error",e=>window.__errs.push(String(e.message||(e.error&&e.error.stack)||e)));addEventListener("unhandledrejection",e=>window.__errs.push("promise: "+String((e.reason&&e.reason.stack)||e.reason)));</script>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --line: #2b2f38; --fg: #e6e9ef; --muted: #98a0ad;
+    --accent: #6ea8fe; --good: #57c98a; --warn: #e0b341; --bad: #e06c6c; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, sans-serif; }
+  header { padding: 16px 22px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 650; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  header code { font-family: var(--mono); color: var(--accent); }
+  main { display: grid; grid-template-columns: 280px 1fr; gap: 0; min-height: calc(100vh - 70px); }
+  .controls { padding: 18px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
+  .controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+  .controls select, .controls input[type=number] {
+    width: 100%; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font: inherit;
+  }
+  .controls .row { display: flex; gap: 10px; align-items: center; }
+  .controls .row input[type=checkbox] { width: 16px; height: 16px; }
+  .controls .row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }
+  button {
+    background: var(--accent); color: #0b0d10; border: 0; border-radius: 7px; padding: 9px 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: var(--panel); color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .viewer { padding: 18px; overflow: auto; }
+  #drop {
+    border: 1.5px dashed var(--line); border-radius: 12px; padding: 40px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s;
+  }
+  #drop.hot { border-color: var(--accent); color: var(--fg); background: #1a2230; }
+  .stage { position: relative; display: inline-block; line-height: 0; }
+  .stage canvas { border: 1px solid var(--line); border-radius: 6px; display: block; }
+  .stage svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .setqa { margin: 16px 0 10px; font-size: 13px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
+  .setqa b { color: var(--fg); font-weight: 600; }
+  .warn { color: var(--warn); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num { font-family: var(--mono); }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 7px; border: 1px solid #0006; }
+  .pill { font-family: var(--mono); font-size: 12px; padding: 1px 7px; border-radius: 20px; }
+  .pill.ok { background: #173a28; color: var(--good); }
+  .pill.no { background: #3a1d1d; color: var(--bad); }
+  .hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>GetMapped <span style="color:var(--muted);font-weight:400">— browser demo</span></h1>
+  <p>Drop a vector PDF plot. It runs entirely in your browser via <code>pdf.js</code> + the TypeScript port — no server, no upload.</p>
+</header>
+<main>
+  <aside class="controls">
+    <div>
+      <label for="prior">Shape prior</label>
+      <select id="prior">
+        <option value="free">free — no assumption</option>
+        <option value="lobe" selected>lobe — single-peaked</option>
+        <option value="monotone">monotone — one direction</option>
+        <option value="smooth">smooth — no spikes</option>
+      </select>
+    </div>
+    <div id="tolWrap">
+      <label for="tol">Tolerance</label>
+      <input id="tol" type="number" step="0.01" min="0" value="0.08" />
+    </div>
+    <div>
+      <label for="expected">Expected curves</label>
+      <input id="expected" type="number" min="0" step="1" value="0" />
+      <div class="hint">0 = auto (no cap)</div>
+    </div>
+    <div>
+      <label for="orderby">Order by</label>
+      <select id="orderby">
+        <option value="peak-x" selected>peak-x</option>
+        <option value="mean-y">mean-y</option>
+        <option value="first-x">first-x</option>
+      </select>
+    </div>
+    <div class="row">
+      <input id="split" type="checkbox" />
+      <label for="split">Split shared-stroke lobes</label>
+    </div>
+    <button id="rerun" disabled>Re-extract</button>
+    <button id="csv" class="ghost" disabled>Download CSV</button>
+    <button id="sample" class="ghost">Load sample plot</button>
+  </aside>
+  <section class="viewer">
+    <div id="drop">
+      <strong>Drop a PDF here</strong> or click to choose
+      <input id="file" type="file" accept="application/pdf" hidden />
+    </div>
+    <div id="stage" class="stage" hidden>
+      <canvas id="pdf"></canvas>
+      <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="setqa" class="setqa" hidden></div>
+    <div id="tableWrap" hidden>
+      <table id="qa"><thead><tr>
+        <th>curve</th><th>n</th><th>peak-x</th><th>conf</th><th>violation</th><th>x-mono</th><th>passed</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

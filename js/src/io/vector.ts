@@ -97,7 +97,9 @@ function rgbObj(a: any): [number, number, number] {
 }
 
 export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0.15): Promise<VectorPage> {
-  const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false }).promise;
+  // pdf.js TRANSFERS (detaches) the input buffer to its worker — pass a copy so the caller can reuse `data`
+  // (e.g. render the same PDF and extract() from it without the buffer going detached).
+  const doc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
   const page = await doc.getPage(pageNum + 1);
   const view = page.view as number[]; // [x0,y0,x1,y1] in pt
   const H = view[3] - view[1];

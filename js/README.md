@@ -32,3 +32,17 @@ for (const c of cs.curves) {
 // The library assigns neutral handles c0, c1, ...; the caller maps order -> meaning:
 // const named = labeled(cs, { 0: "blue", 1: "green", 2: "red" });
 ```
+
+## Demo
+
+A static, single-page demo (`demo/`) runs the whole thing in the browser: drop a vector PDF, it renders the
+page with pdf.js, overlays the recovered curves on the render, shows per-curve QA/confidence, and exports
+CSV. No server, no upload — the bytes never leave the page.
+
+```
+npm run build:demo      # bundles app + pdf.js worker into demo/dist/ (GitHub Pages-ready)
+npm run serve:demo      # serves demo/dist/ at http://localhost:8099
+```
+
+`demo/dist/` is a build artifact (git-ignored); rebuild it on deploy. The bundled `pdf.worker.js` is large
+(~2 MB) — that's pdf.js, the only runtime dependency.
