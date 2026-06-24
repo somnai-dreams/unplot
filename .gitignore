@@ -11,3 +11,7 @@ venv/
 .mypy_cache/
 .DS_Store
 *.so
+
+# manual-comparison artifacts (regenerable / user data)
+compare/plots/
+compare/submissions/
