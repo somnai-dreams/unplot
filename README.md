@@ -2,8 +2,9 @@
 
 **Read curves off a plot — straight from the vector PDF, with the overlapping ones pulled apart, and an honest confidence score on every curve.**
 
-Most plot digitizers (WebPlotDigitizer, Engauge, PlotDigitizer) are manual, raster-only tools: you load a
-screenshot and click along each curve by hand. GetMapped is built around the two things those tools don't do:
+Tools like WebPlotDigitizer, Engauge, and PlotDigitizer are mature, flexible, *interactive* digitizers — you
+load an image, click to calibrate the axes, and the auto-tracer (with your corrections) pulls out points.
+GetMapped trades that interactivity for two things those tools don't do, so it can run **unattended**:
 
 - **Vector-PDF-native extraction.** When a PDF's curves are real drawn paths (a large fraction of technical
   datasheets), GetMapped reads the *exact* geometry out of the file — no rasterizing, no pixel re-detection,
@@ -90,6 +91,47 @@ datasheet PDFs and reproduces them numerically:
 Raster ingest reproduces clean, non-crossing plots; a tight multi-curve plot where curves overlap over a
 range is only partially recovered, and the QA report flags it (low confidence, failed curves) rather than
 returning a confident-but-wrong result.
+
+### Benchmark
+
+Absolute accuracy on synthetic ground truth — peak error per curve, 20 randomized plots per tier
+(`python bench/benchmark.py`, seed-fixed):
+
+|tier|median|p90|
+|-|-|-|
+|vector · 3 separated|0.5 nm|1.3 nm|
+|vector · 3 crossing|0.9 nm|1.4 nm|
+|vector · 4 crossing|0.6 nm|1.5 nm|
+|raster · 3 separated (clean)|1.3 nm|48 nm|
+|raster · 3 crossing (clean)|1.3 nm|41 nm|
+|raster · 3 separated (noisy)|1.4 nm|50 nm|
+|raster · 3 occluded|1.6 nm|44 nm|
+
+Reading it: **vector extraction is essentially exact** (sub-nm, tight, unaffected by crossings or curve
+count — it's reading drawn geometry). **Raster is typically ~1 nm but has a heavy tail** (p90 in the tens of
+nm) on hard cases — peak detection occasionally fails on a crossing, an occluded lobe, or noise. That tail is
+exactly what the QA report surfaces, so you can drop low-confidence curves instead of trusting them.
+
+## How it compares
+
+GetMapped is narrower than the established tools on purpose. WebPlotDigitizer and Engauge are mature and
+flexible: they handle many chart types (XY, polar, ternary, bar, maps), have capable auto-tracers, and let a
+human fix mistakes live. If you want a GUI to digitize one chart, use them. GetMapped is a **headless library**
+for line/curve plots that reads vector geometry directly and reports its own confidence — built for batch and
+automation, not interactive correction.
+
+|capability|GetMapped|WebPlotDigitizer|Engauge|PlotDigitizer|
+|-|-|-|-|-|
+|reads vector-PDF geometry (no rasterizing)|yes|no (image)|no (image)|no (image)|
+|automatic curve tracing|yes|yes|yes|yes|
+|automatic axis calibration|yes (vector; raster needs anchors)|no (click axes)|no (click axes)|no (click axes)|
+|multi-curve crossing separation|pluggable shape prior|by colour / layers|guided point-match|manual / auto|
+|structured QA / confidence output|yes|no|no|no|
+|headless library / scriptable batch|yes (`pip install`)|no (web app)|no (desktop GUI)|no (web/desktop)|
+|other chart types (polar, bar, …)|no (line/curve only)|yes|yes|yes|
+|license|MIT|AGPL-3.0|GPL|proprietary|
+
+(Competitor capabilities as of mid-2026; verify against their current docs.)
 
 ## Install
 
