@@ -57,6 +57,42 @@ def build(path: str) -> dict:
     return {"frame": FRAME, "x_range": X_RANGE, "y_range": Y_RANGE, "peaks": truth}
 
 
+def build_gridded(path: str) -> dict:
+    """The same 3-lobe plot, but with a GRID drawn as a single stroke (every segment axis-aligned). The grid's
+    bbox spans the whole frame, so the thin-bbox check misses it; only the ruled-path filter drops it. Tests
+    that the grid is removed without touching the curves."""
+    doc = fitz.open()
+    page = doc.new_page(width=420, height=300)
+    x0, y0, x1, y1 = FRAME
+
+    box = [fitz.Point(x0, y0), fitz.Point(x1, y0), fitz.Point(x1, y1), fitz.Point(x0, y1), fitz.Point(x0, y0)]
+    sh = page.new_shape(); sh.draw_polyline(box); sh.finish(color=(0, 0, 0), width=0.8); sh.commit()
+
+    grid = page.new_shape()                       # one shape, many axis-aligned segments = one ruled path
+    for gx in range(400, 701, 50):
+        grid.draw_line(fitz.Point(_x_to_px(gx), y0), fitz.Point(_x_to_px(gx), y1))
+    for gv in (0.0, 0.5, 1.0, 1.5, 2.0):
+        grid.draw_line(fitz.Point(x0, _v_to_py(gv)), fitz.Point(x1, _v_to_py(gv)))
+    grid.finish(color=(0.7, 0.7, 0.7), width=0.5, closePath=False); grid.commit()
+
+    truth: dict[str, float] = {}
+    nm = np.arange(400.0, 700.001, 2.0)
+    for name, color, peak, amp, sigma in LOBES:
+        v = amp * np.exp(-0.5 * ((nm - peak) / sigma) ** 2)
+        pts = [fitz.Point(_x_to_px(x), _v_to_py(val)) for x, val in zip(nm, v)]
+        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=color, width=1.2, closePath=False); sh.commit()
+        truth[name] = peak
+
+    for lbl in (400, 500, 600, 700):
+        page.insert_text(fitz.Point(_x_to_px(lbl) - 6, y1 + 12), str(lbl), fontsize=8)
+    for lbl in (0, 1, 2):
+        page.insert_text(fitz.Point(x0 - 16, _v_to_py(lbl) + 3), str(lbl), fontsize=8)
+
+    doc.save(path)
+    doc.close()
+    return {"frame": FRAME, "x_range": X_RANGE, "y_range": Y_RANGE, "peaks": truth}
+
+
 def build_raster_monotone(dpi: int = 200):
     """Render 3 non-crossing monotone (rising) curves to a raster image, with the known px frame + axis
     anchors + per-curve end values. Exercises the raster continuity-march on a clean, separable case

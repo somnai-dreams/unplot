@@ -77,6 +77,24 @@ def _dash_style(dash: str | None) -> str:
     return "solid"
 
 
+def _is_ruled(d: dict, tol: float = 0.75) -> bool:
+    """True if every drawn segment is an axis-aligned straight line — a grid / frame / ruled-line path, not a
+    data curve. This catches a grid drawn as ONE stroke (its bbox is the whole frame, so the thin-bbox check
+    misses it). A real curve is kept: a Bezier segment disqualifies immediately, and a polyline curve has
+    diagonal flank segments. A curve's flat baseline survives too, because the same stroke also rises/falls."""
+    saw_line = False
+    for it in d["items"]:
+        op = it[0]
+        if op == "c":                                        # a Bezier -> a real curve
+            return False
+        if op == "l":
+            p1, p2 = it[1], it[2]
+            if abs(p1.x - p2.x) > tol and abs(p1.y - p2.y) > tol:
+                return False                                 # a diagonal line -> could be data
+            saw_line = True
+    return saw_line
+
+
 def _is_box(P: NDArray, r, frac: float = 0.9, tol: float = 3.0) -> bool:
     """True if (nearly) all points hug the bbox border — i.e. this path is the plot frame, not a curve.
     A full-span diagonal curve has interior points, so it survives; a rectangle's points are all on edges."""
@@ -92,7 +110,8 @@ def paths_in_frame(page: VectorPage, frame: tuple[float, float, float, float],
 
     Rejects non-curve geometry:
       - the plot frame box (fills the frame and hugs its border) when `drop_frame`,
-      - axis ticks / gridlines (bbox thinner than `min_wh` in either dimension).
+      - axis ticks / single gridlines (bbox thinner than `min_wh` in either dimension),
+      - a grid drawn as one stroke (every segment axis-aligned; see `_is_ruled`).
     `color_sat`: a stroke counts as colour-keyed when max(rgb)-min(rgb) exceeds it (non-grey).
     """
     x0, y0, x1, y1 = frame
@@ -105,7 +124,9 @@ def paths_in_frame(page: VectorPage, frame: tuple[float, float, float, float],
         r = d["rect"]
         if not (x0 - 2 <= r.x0 and r.x1 <= x1 + 2 and y0 - 2 <= r.y0 and r.y1 <= y1 + 2):
             continue
-        if r.width < min_wh or r.height < min_wh:          # axis tick / gridline
+        if r.width < min_wh or r.height < min_wh:          # axis tick / gridline (single thin stroke)
+            continue
+        if _is_ruled(d):                                   # a grid / ruled-line path drawn as one stroke
             continue
         P = _flatten(d)
         if not len(P):

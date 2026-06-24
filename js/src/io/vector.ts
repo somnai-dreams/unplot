@@ -18,6 +18,7 @@ export interface RawPath {
   width: number; // bbox width
   height: number; // bbox height
   nSegs: number; // drawn segment count
+  ruled: boolean; // every segment axis-aligned & straight -> grid / frame / ruled line, not a curve
 }
 
 export interface Word {
@@ -91,6 +92,34 @@ function flatten(OPS: Record<string, number>, subOps: number[], coords: number[]
   return pts;
 }
 
+/** True if every drawn segment is an axis-aligned straight line (device space) — a grid / frame / ruled-line
+ *  path, not a data curve. Mirrors the Python `_is_ruled`: a Bezier disqualifies immediately, a polyline curve
+ *  has diagonal flank segments, and a curve's flat baseline survives (its stroke also rises/falls). Catches a
+ *  grid drawn as ONE stroke, which the thin-bbox check misses. */
+function isRuled(OPS: Record<string, number>, subOps: number[], coords: number[], ctm: Mat, tol = 0.75): boolean {
+  let i = 0;
+  let cur: [number, number] | null = null;
+  let sawLine = false;
+  for (const op of subOps) {
+    if (op === OPS.moveTo) {
+      cur = apply(ctm, coords[i], coords[i + 1]); i += 2;
+    } else if (op === OPS.lineTo) {
+      const next = apply(ctm, coords[i], coords[i + 1]); i += 2;
+      if (cur) {
+        if (Math.abs(cur[0] - next[0]) > tol && Math.abs(cur[1] - next[1]) > tol) return false; // diagonal
+        sawLine = true;
+      }
+      cur = next;
+    } else if (op === OPS.curveTo || op === OPS.curveTo2 || op === OPS.curveTo3) {
+      return false; // a Bezier -> a real curve
+    } else if (op === OPS.rectangle) {
+      cur = apply(ctm, coords[i], coords[i + 1]); i += 4; sawLine = true; // axis-aligned box (e.g. the frame)
+    }
+    // closePath: no coords
+  }
+  return sawLine;
+}
+
 function rgbObj(a: any): [number, number, number] {
   if (Array.isArray(a)) return [a[0], a[1], a[2]];
   return [a[0] ?? a["0"], a[1] ?? a["1"], a[2] ?? a["2"]];
@@ -141,6 +170,7 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
             width: Math.max(...xs) - Math.min(...xs),
             height: Math.max(...ys) - Math.min(...ys),
             nSegs: pending.subOps.filter((o) => o !== OPS.moveTo).length,
+            ruled: isRuled(OPS, pending.subOps, pending.coords, ctm),
           });
         }
         pending = null;
@@ -196,7 +226,8 @@ export function pathsInFrame(
     const [bx0, by0, bx1, by1] = bb;
     if (!(x0 - 2 <= bx0 && bx1 <= x1 + 2 && y0 - 2 <= by0 && by1 <= y1 + 2)) continue;
     const bw = bx1 - bx0, bh = by1 - by0;
-    if (bw < minWh || bh < minWh) continue; // axis tick / gridline
+    if (bw < minWh || bh < minWh) continue; // axis tick / single gridline
+    if (p.ruled) continue;                  // a grid / ruled-line path drawn as one stroke
     if (dropFrame && bw > 0.9 * fw && bh > 0.9 * fh && isBox(p.pts, bb)) continue; // the plot box
     out.push(p);
   }
