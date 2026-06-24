@@ -134,6 +134,31 @@ automation, not interactive correction.
 
 (Competitor capabilities as of mid-2026; verify against their current docs.)
 
+### Head-to-head accuracy vs WebPlotDigitizer
+
+WPD is interactive and can't be batch-scripted, so this was run by driving the real WPD 4.8 with its own
+automatic-extraction algorithm (`AveragingWindowAlgo`) and an *exact* axis calibration set through its API —
+i.e. WPD at its best, not a sloppy hand-trace. Same synthetic plots, peak error in nm:
+
+|plot (3 curves unless noted)|WebPlotDigitizer|GetMapped raster|GetMapped vector|
+|-|-|-|-|
+|single curve (black, framed)|0.2 ¹|0.9|0.7|
+|3 separated|0.7|0.6|0.7|
+|3 crossing|0.5|0.8|0.7|
+|3 noisy|blue/red ~1, green **~150** ²|0.7|0.7|
+
+On clean colour-coded plots it's **a dead heat** — both land sub-nm to ~1 nm, because both do colour-mask +
+per-column averaging (WPD a hair better on crossings, GetMapped a hair better when curves are separated). WPD
+is a strong, mature tool, not an also-ran. Where GetMapped pulls ahead:
+
+- **Vector PDFs** — WPD can't read them at all; GetMapped extracts the drawn geometry (0.7 nm, no contest).
+- **Noise** ² — WPD's fixed colour threshold caught noise pixels (green peak 400 vs 550 at default distance);
+  GetMapped's denoising rode it out. Tuning/masking would help WPD.
+- **No manual masking** ¹ — WPD's auto grabbed the black plot frame until a region mask was drawn; GetMapped
+  removes frames/gridlines automatically.
+
+Plus the categorical wins from the matrix: headless batch, a structured QA report, and MIT licensing.
+
 ## Install
 
 ```bash
