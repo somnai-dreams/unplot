@@ -156,3 +156,58 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
   }
   return { paths, words, rect: [view[0], 0, view[2], H] };
 }
+
+/** [x0,y0,x1,y1] bounding box of a flattened path's points. */
+export function pathBbox(pts: number[][]): [number, number, number, number] {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of pts) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return [x0, y0, x1, y1];
+}
+
+/** True if (nearly) all points hug the bbox border — i.e. this path is the plot frame, not a curve. A
+ *  full-span diagonal curve has interior points, so it survives; a rectangle's points are all on edges. */
+function isBox(pts: number[][], bb: [number, number, number, number], frac = 0.9, tol = 3.0): boolean {
+  const [bx0, by0, bx1, by1] = bb;
+  let near = 0;
+  for (const [x, y] of pts) {
+    if (Math.abs(x - bx0) < tol || Math.abs(x - bx1) < tol || Math.abs(y - by0) < tol || Math.abs(y - by1) < tol) near++;
+  }
+  return pts.length > 0 && near / pts.length > frac;
+}
+
+/** Stroked CURVE paths whose bbox sits inside `frame`. Rejects the plot frame box (fills the frame and hugs
+ *  its border) when `dropFrame`, and axis ticks / gridlines (bbox thinner than `minWh` in either dim). The
+ *  TS adapter has already flattened strokes and computed colour/dash, so this just filters. */
+export function pathsInFrame(
+  page: VectorPage, frame: [number, number, number, number],
+  minSegs = 3, dropFrame = true, minWh = 6.0,
+): RawPath[] {
+  const [x0, y0, x1, y1] = frame;
+  const fw = x1 - x0, fh = y1 - y0;
+  const out: RawPath[] = [];
+  for (const p of page.paths) {
+    if (p.nSegs < minSegs || p.pts.length === 0) continue;
+    const bb = pathBbox(p.pts);
+    const [bx0, by0, bx1, by1] = bb;
+    if (!(x0 - 2 <= bx0 && bx1 <= x1 + 2 && y0 - 2 <= by0 && by1 <= y1 + 2)) continue;
+    const bw = bx1 - bx0, bh = by1 - by0;
+    if (bw < minWh || bh < minWh) continue; // axis tick / gridline
+    if (dropFrame && bw > 0.9 * fw && bh > 0.9 * fh && isBox(p.pts, bb)) continue; // the plot box
+    out.push(p);
+  }
+  return out;
+}
+
+/** Bounding box of all curve-like stroked paths on the page — the auto-frame for a single-plot page. For
+ *  multi-plot pages, pass an explicit `frame` to extract() instead. Returns null if no curve paths. */
+export function curvePathsBbox(page: VectorPage, minSegs = 3): [number, number, number, number] | null {
+  const boxes = page.paths.filter((p) => p.nSegs >= minSegs && p.pts.length > 0).map((p) => pathBbox(p.pts));
+  if (!boxes.length) return null;
+  return [
+    Math.min(...boxes.map((b) => b[0])), Math.min(...boxes.map((b) => b[1])),
+    Math.max(...boxes.map((b) => b[2])), Math.max(...boxes.map((b) => b[3])),
+  ];
+}
