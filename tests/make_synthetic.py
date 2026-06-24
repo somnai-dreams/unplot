@@ -44,7 +44,7 @@ def build(path: str) -> dict:
     for name, color, peak, amp, sigma in LOBES:
         v = amp * np.exp(-0.5 * ((nm - peak) / sigma) ** 2)
         pts = [fitz.Point(_x_to_px(x), _v_to_py(val)) for x, val in zip(nm, v)]
-        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=color, width=1.2); sh.commit()
+        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=color, width=1.2, closePath=False); sh.commit()
         truth[name] = peak
 
     for lbl in (400, 500, 600, 700):
@@ -71,7 +71,7 @@ def build_raster_monotone(dpi: int = 200):
     for name, b in levels.items():
         v = b + 1.0 * (nm - 400.0) / 300.0                 # rises b -> b+1 across the axis
         pts = [fitz.Point(_x_to_px(x), _v_to_py(val)) for x, val in zip(nm, v)]
-        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=colors[name], width=1.6); sh.commit()
+        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=colors[name], width=1.6, closePath=False); sh.commit()
         truth_end[name] = float(b + 1.0)
     pix = page.get_pixmap(dpi=dpi)
     img = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, pix.n)[..., :3].copy()
@@ -94,13 +94,48 @@ def build_raster_crossing(dpi: int = 200):
     for a, b in ((0.2, 1.8), (1.8, 0.2)):                 # rising, falling
         v = a + (b - a) * (nm - 400.0) / 300.0
         pts = [fitz.Point(_x_to_px(x), _v_to_py(val)) for x, val in zip(nm, v)]
-        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.6); sh.commit()
+        sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.6, closePath=False); sh.commit()
     pix = page.get_pixmap(dpi=dpi)
     img = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, pix.n)[..., :3].copy()
     s = dpi / 72.0
     return {"img": img, "frame_px": (x0 * s, y0 * s, x1 * s, y1 * s),
             "x_anchors": [(_x_to_px(400.0) * s, 400.0), (_x_to_px(700.0) * s, 700.0)],
             "y_anchors": [(_v_to_py(0.0) * s, 0.0), (_v_to_py(2.0) * s, 2.0)]}
+
+
+def build_folded_axis(path: str, minus_style: str = "stripped") -> dict:
+    """Plot with a ±-symmetric y-axis (+2…−2, labelled 2 1 0 … top→bottom) and one diagonal curve from
+    y=+1.5 (left) to y=−1.5 (right). `minus_style`: 'stripped' (bare digits → a folded V, exercises the
+    unfold) or 'unicode' (U+2212 minus, exercises minus normalization)."""
+    fr = (60.0, 40.0, 360.0, 240.0)
+    x0, y0, x1, y1 = fr
+
+    def x2px(x):
+        return x0 + (x - 400.0) / 300.0 * (x1 - x0)
+
+    def y2py(v):
+        return y0 + (2.0 - v) / 4.0 * (y1 - y0)        # +2 at top, −2 at bottom
+
+    doc = fitz.open()
+    pg = doc.new_page(width=420, height=300)
+    box = [fitz.Point(x0, y0), fitz.Point(x1, y0), fitz.Point(x1, y1), fitz.Point(x0, y1), fitz.Point(x0, y0)]
+    sh = pg.new_shape(); sh.draw_polyline(box); sh.finish(color=(0, 0, 0), width=0.8); sh.commit()
+    for t in (400, 500, 600, 700):
+        pg.insert_text(fitz.Point(x2px(t) - 6, y1 + 12), str(t), fontsize=8)
+    for k in (2, 1, 0, -1, -2):
+        if k >= 0:
+            lbl = str(k)
+        elif minus_style == "unicode":
+            lbl = "−" + str(abs(k))
+        else:
+            lbl = str(abs(k))                          # stripped: minus lost -> folded
+        pg.insert_text(fitz.Point(x0 - 18, y2py(k) + 3), lbl, fontsize=8)
+    nm = np.arange(400.0, 700.001, 4.0)
+    yv = 1.5 - 3.0 * (nm - 400.0) / 300.0              # +1.5 -> -1.5, monotone
+    pts = [fitz.Point(x2px(x), y2py(v)) for x, v in zip(nm, yv)]
+    sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=(0, 0, 0), width=1.4, closePath=False); sh.commit()
+    doc.save(path); doc.close()
+    return {"frame": fr, "y_left": 1.5, "y_right": -1.5}
 
 
 if __name__ == "__main__":

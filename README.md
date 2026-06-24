@@ -68,10 +68,10 @@ the tracer swap curves). Priors are plain dataclasses — write your own by impl
 **Not yet — "future / contributions welcome":**
 - **Log-spaced axes.** Calibration is linear pt→value. Axes whose *values* are log quantities (log exposure,
   log sensitivity) work fine because they are drawn linearly; genuinely log-*spaced* axes are not handled.
-- **Mono raster crossings.** When a raster plot colour-codes its curves, GetMapped separates them by hue, so
-  crossings and shared baselines don't tangle. When curves share a single colour and overlap over a *range*
-  (a tight mono multi-lobe plot), the greyscale tracer can mis-assign — separation degrades and the QA
-  reports it (low confidence, flagged curves). Vector ingest, or a colour-coded source, is the better route.
+- **Heavily-occluded mono raster.** Colour-keyed curves separate by hue; single-colour (mono) curves
+  separate by continuity + the shape prior, which handles clean crossings well. The hard case is a
+  low-resolution mono *scan* where a weak curve is partly hidden under a stronger one — separation can
+  mis-assign, and the QA reports it (low confidence). Vector ingest, or a colour-coded source, is better there.
 - Broken/partial axis boxes, dashed lines mistaken for separate curves, legends drawn over curves, exotic
   scales, and automatic frame detection for raster scans.
 
@@ -101,17 +101,17 @@ Absolute accuracy on synthetic ground truth — peak error per curve, 20 randomi
 |vector · 3 separated|0.5 nm|1.3 nm|
 |vector · 3 crossing|0.9 nm|1.4 nm|
 |vector · 4 crossing|0.6 nm|1.5 nm|
-|raster colour · 3 crossing|1.3 nm|2.6 nm|
-|raster colour · 3 crossing (noisy)|1.3 nm|2.1 nm|
-|raster mono · 3 crossing|1.2 nm|45 nm|
-|raster mono · 3 occluded|1.4 nm|50 nm|
+|raster colour · 3 crossing|1.1 nm|1.5 nm|
+|raster colour · 3 crossing (noisy)|1.1 nm|1.5 nm|
+|raster mono · 3 crossing|1.0 nm|1.6 nm|
+|raster mono · 3 occluded|1.3 nm|6.3 nm|
 
 Reading it: **vector is essentially exact** (sub-nm, tight, unaffected by crossings or curve count — it reads
-drawn geometry). **Colour-coded raster is tight too** (p90 ~2–3 nm) — curves are separated by hue, so
-crossings and shared baselines don't tangle. **Mono (single-colour) raster keeps a heavy tail** (p90 ~45–50
-nm) on crossings and occluded lobes — there's no colour to separate by, so the greyscale tracer can
-mis-assign. That tail is exactly what the QA report surfaces, so you can drop low-confidence curves instead
-of trusting them.
+drawn geometry). **Raster is tight too on synthetic plots** — colour-keyed and mono both land ~1 nm median,
+p90 within a couple of nm; an **occluded** lobe (one weak curve buried under its neighbours) is the harder
+synthetic case (p90 ~6 nm). The real-world hard case isn't captured here: **low-resolution mono *scans* with
+heavy occlusion** (where there's no colour to separate by and the curve is partly hidden) still degrade — and
+when they do, the QA report flags it (low confidence) rather than returning a confident-but-wrong curve.
 
 ## How it compares
 

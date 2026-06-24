@@ -24,6 +24,11 @@ class CalibrationError(ValueError):
     pass
 
 
+def _normalize_minus(s: str) -> str:
+    """Map typographic minus/dashes to ASCII '-' so a label like '−2' (U+2212) parses as a negative."""
+    return s.replace("−", "-").replace("–", "-").replace("—", "-")
+
+
 def axis_label_anchors(words: list[tuple], frame: tuple[float, float, float, float], axis: str) -> Anchors:
     """Numeric tick labels just outside the frame -> [(pt_pos, value)]. Allows negatives (logH axes).
 
@@ -33,7 +38,7 @@ def axis_label_anchors(words: list[tuple], frame: tuple[float, float, float, flo
     x0, y0, x1, y1 = frame
     anchors: Anchors = []
     for w in words:
-        wx0, wy0, wx1, wy1, txt = w[0], w[1], w[2], w[3], str(w[4]).strip()
+        wx0, wy0, wx1, wy1, txt = w[0], w[1], w[2], w[3], _normalize_minus(str(w[4]).strip())
         if not _NUMERIC.fullmatch(txt):
             continue
         cx, cy = (wx0 + wx1) / 2, (wy0 + wy1) / 2
@@ -42,6 +47,36 @@ def axis_label_anchors(words: list[tuple], frame: tuple[float, float, float, flo
         elif axis == "y" and x0 - 40 < cx < x0 and y0 - 10 <= cy <= y1 + 10:
             anchors.append((cy, float(txt)))
     return sorted(anchors)
+
+
+def unfold_symmetric(anchors: Anchors, axis: str) -> Anchors:
+    """Recover lost signs on a ±-symmetric (folded) axis.
+
+    A film log-sensitivity / log-H axis labelled e.g. `2 1 0 1 2` top->bottom has true values `+2 +1 0 −1 −2`;
+    if the minus signs were stripped (detached glyph, or a font we couldn't read) the labels read as a V in
+    |value| and the axis silently collapses. Detect that V and restore alternating signs about the near-zero
+    turning point. Which arm is negative is chosen from GEOMETRY, not domain: for a y-axis the arm lower on
+    the plot (larger source-y) is negative; for an x-axis the arm to the left (smaller source-x). No-op on a
+    normal monotone axis, or one that already carries signs.
+    """
+    a = sorted(anchors)
+    vals = [v for _, v in a]
+    n = len(vals)
+    if n < 5 or any(v < 0 for v in vals):
+        return anchors
+    ti = min(range(n), key=lambda i: vals[i])                       # turning point = smallest |value|
+    if ti == 0 or ti == n - 1 or vals[ti] > 0.25 * max(vals):
+        return anchors                                              # turning point not interior / not ~0
+    left, right = vals[:ti + 1], vals[ti:]
+    is_v = (all(left[i] >= left[i + 1] for i in range(len(left) - 1))
+            and all(right[i] <= right[i + 1] for i in range(len(right) - 1)))
+    if not is_v:
+        return anchors
+    out: Anchors = []
+    for i, (pos, v) in enumerate(a):
+        neg = (axis == "y" and i > ti) or (axis == "x" and i < ti)
+        out.append((pos, -v if neg else v))
+    return out
 
 
 def robust_fit(anchors: Anchors) -> tuple[float, float, float, int]:
@@ -66,15 +101,25 @@ def robust_fit(anchors: Anchors) -> tuple[float, float, float, int]:
         pk, vk = pos[keep], val[keep]
         mm, bb = np.polyfit(pk, vk, 1)
         r = float(np.corrcoef(pk, vk)[0, 1]) if int(keep.sum()) > 2 else 1.0
-        return float(mm), float(bb), abs(r), int((~keep).sum())
-    r = float(np.corrcoef(pos, val)[0, 1])
-    return m, b, abs(r), 0
+        scale, offset, r_out, n_dropped = float(mm), float(bb), abs(r), int((~keep).sum())
+    else:
+        scale, offset, r_out, n_dropped = m, b, abs(float(np.corrcoef(pos, val)[0, 1])), 0
+    # Degenerate-fit guard: labels vary but the map is near-constant (scale~0). This is the folded-axis
+    # signature (median of mixed-sign slopes ~ 0). Fail LOUD instead of returning a flat axis with r=1.0.
+    val_range = float(val.max() - val.min())
+    pos_span = float(pos.max() - pos.min())
+    if val_range > 1e-9 and abs(scale) * pos_span < 0.05 * val_range:
+        raise CalibrationError(
+            "axis labels vary but the fit is near-constant (scale~0) — likely a folded ±-symmetric axis "
+            "whose minus signs were lost; sign recovery did not apply. Refusing to return a flat axis.")
+    return scale, offset, r_out, n_dropped
 
 
 def calibrate_axis(words: list[tuple], frame: tuple[float, float, float, float], axis: str,
                    explicit: Anchors | None = None) -> AxisCalibration:
     """Build an AxisCalibration from auto-detected labels, or from explicit (pt,value) anchors."""
     anchors = explicit if explicit is not None else axis_label_anchors(words, frame, axis)
+    anchors = unfold_symmetric(anchors, axis)
     scale, offset, r, n_dropped = robust_fit(anchors)
     return AxisCalibration(scale=scale, offset=offset, r=r,
                            anchors=tuple((float(p), float(v)) for p, v in sorted(anchors)),

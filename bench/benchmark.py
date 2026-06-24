@@ -35,7 +35,7 @@ def make_pdf(peaks, sigma, amp, path, mono=False):
         v = a * np.exp(-0.5 * ((nm - pk) / s) ** 2)
         pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(nm, v)]
         col = (0, 0, 0) if mono else COLORS[k % 4]
-        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=col, width=1.4); sh.commit()
+        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=col, width=1.4, closePath=False); sh.commit()
     for lbl in (400, 500, 600, 700):
         pg.insert_text(fitz.Point(x2px(lbl) - 6, FRAME[3] + 12), str(lbl), fontsize=8)
     for lbl in (0, 1, 2):

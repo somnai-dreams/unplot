@@ -65,7 +65,7 @@ def build():
             v = lobe(peak, sigma, amp)
             col = (0, 0, 0) if single else COLORS[cid]
             pts = [fitz.Point(x2px(x), v2py(val)) for x, val in zip(NM, v)]
-            sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=col, width=1.6); sh.commit()
+            sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=col, width=1.6, closePath=False); sh.commit()
             gt[cid] = [[float(x), float(val)] for x, val in zip(NM, v)]
         doc.save(os.path.join(OUT, f"{name}.pdf"))
         pix = pg.get_pixmap(dpi=DPI)
