@@ -4,14 +4,31 @@ A browser-native TS port so GetMapped can run on a static page (e.g. GitHub Page
 no Pyodide. PDF vector geometry comes from **pdf.js** (`pdfjs-dist`, Apache-2.0); everything else is
 dependency-free array math.
 
-**Status.** The one piece with real risk — the pdf.js → vector-path adapter (`src/io/vector.ts`, the TS
-equivalent of the Python `io/vector.py`) — is done and tested. It walks pdf.js's operator list to recover
-drawn paths with stroke **colour + dash**, flattens Béziers, applies the CTM, flips to a y-down convention,
-and reads numeric axis labels for calibration. Verified to recover colour-keyed curves + frame + labels from
-a synthetic PDF (`npm test`). The rest of the pipeline (axis calibration, de-fan/chain/split, separation, QA)
-is mechanical to port from the Python — plain array math, no dependencies.
+**Status.** The full **vector** extract pipeline is ported and tested end-to-end: pdf.js → vector-path
+adapter (`src/io/vector.ts`) → axis calibration (`src/axes/calibrate.ts`, incl. folded ±-axis sign
+recovery) → de-fan / chain / split (`src/curves/vectorpaths.ts`, with the valley-join guard) → crossing
+separation (`src/separate.ts`) → shape QA + confidence (`src/qa/*.ts`, `src/priors.ts`) → `extract()`
+(`src/extract.ts`). Everything but pdf.js is dependency-free array math. Raster ingest is not yet ported.
+
+`npm test` runs the suite: the pdf.js adapter recovery, the curve-geometry guards, an end-to-end
+`extract()` on a synthetic colour-keyed fixture, and folded-axis calibration parity.
 
 ```
 npm install
 npm test
+```
+
+## Usage
+
+```ts
+import { extract, lobe } from "./src/index.ts";
+
+const data = new Uint8Array(await (await fetch("plot.pdf")).arrayBuffer());
+const cs = await extract(data, { expectedCurves: 3, prior: lobe(0.08), orderBy: "peak-x" });
+
+for (const c of cs.curves) {
+  console.log(c.id, c.style.color, c.qa.confidence, c.points); // points are [x, y] in DATA space
+}
+// The library assigns neutral handles c0, c1, ...; the caller maps order -> meaning:
+// const named = labeled(cs, { 0: "blue", 1: "green", 2: "red" });
 ```
