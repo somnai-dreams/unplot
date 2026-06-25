@@ -3,182 +3,253 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GetMapped — browser demo</title>
+<title>GetMapped — read curves off a vector PDF</title>
 <script>window.__errs=[];addEventListener("error",e=>window.__errs.push(String(e.message||(e.error&&e.error.stack)||e)));addEventListener("unhandledrejection",e=>window.__errs.push("promise: "+String((e.reason&&e.reason.stack)||e.reason)));</script>
 <style>
   :root {
-    --bg: #14161a; --panel: #1c1f26; --line: #2b2f38; --fg: #e6e9ef; --muted: #98a0ad;
-    --accent: #6ea8fe; --good: #57c98a; --warn: #e0b341; --bad: #e06c6c; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);   /* stronger than the built-in ease-out */
+    --bg: #f4f5f7; --surface: #ffffff; --raised: #fbfbfc;
+    --fg: #18181b; --muted: #6b7280; --faint: #9ca3af;
+    --line: #ececf0; --line-strong: #e2e3e8;
+    --accent: #4f46e5; --accent-press: #4338ca; --accent-soft: #eef0fe;
+    --good: #16a34a; --warn: #b45309; --bad: #dc2626;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --shadow-sm: 0 1px 2px rgba(24,24,27,.05), 0 1px 3px rgba(24,24,27,.04);
+    --shadow: 0 1px 2px rgba(24,24,27,.04), 0 6px 20px rgba(24,24,27,.06);
+    --r-card: 16px; --r-ctl: 10px;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, sans-serif; }
-  header { padding: 16px 22px; border-bottom: 1px solid var(--line); }
-  header h1 { margin: 0; font-size: 18px; font-weight: 650; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-  header code { font-family: var(--mono); color: var(--accent); }
-  main { display: grid; grid-template-columns: 280px 1fr; gap: 0; min-height: calc(100vh - 70px); }
-  .controls { padding: 18px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
-  .controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
-  .controls select, .controls input[type=number] {
-    width: 100%; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font: inherit;
+  [hidden] { display: none !important; }   /* beat the display set by .btn/.pagebar/.stage etc. */
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  .app { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
+
+  /* header */
+  .head { margin-bottom: 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand h1 { margin: 0; font-size: 22px; font-weight: 640; letter-spacing: -0.02em; }
+  .badge {
+    font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--accent);
+    background: var(--accent-soft); padding: 3px 9px; border-radius: 999px;
+  }
+  .head .lede { margin: 10px 0 0; max-width: 60ch; color: var(--fg); font-size: 15px; text-wrap: pretty; }
+  .head .note { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .head .note b { color: var(--fg); font-weight: 600; }
+
+  /* layout */
+  .grid { display: grid; grid-template-columns: 268px 1fr; gap: 20px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .panel { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-sm); }
+  .controls { padding: 18px; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* form fields */
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field > label, .grouplabel { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+  select, input[type=number] {
+    width: 100%; height: 36px; padding: 0 10px; font: inherit; color: var(--fg);
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
     transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+    appearance: none; -webkit-appearance: none;
   }
-  .controls select:focus-visible, .controls input:focus-visible {
-    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110, 168, 254, .18);
+  select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5L6 7.5L9 4.5' stroke='%239ca3af' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"); background-repeat: no-repeat; background-position: right 11px center; padding-right: 28px; cursor: pointer; }
+  select:hover, input:hover { border-color: #d3d5dc; }
+  select:focus-visible, input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+  .hint { font-size: 12px; color: var(--faint); }
+  .check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--fg); cursor: pointer; user-select: none; }
+  .check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+  .divider { height: 1px; background: var(--line); margin: 2px 0; }
+
+  /* buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 38px; padding: 0 14px; font: inherit; font-weight: 550; border-radius: var(--r-ctl);
+    border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: transform 120ms var(--ease-out), background-color 140ms var(--ease-out), border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out), color 140ms var(--ease-out);
   }
-  .controls .row { display: flex; gap: 10px; align-items: center; }
-  .controls .row input[type=checkbox] { width: 16px; height: 16px; }
-  .controls .row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }
-  button {
-    background: var(--accent); color: #0b0d10; border: 0; border-radius: 7px; padding: 9px 12px; font: inherit; font-weight: 600; cursor: pointer;
-    transition: transform 140ms var(--ease-out), background-color 140ms ease, border-color 140ms ease, opacity 140ms ease;
-  }
-  button.ghost { background: var(--panel); color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
-  button:active:not(:disabled) { transform: scale(0.97); }   /* press feedback: the UI heard you */
-  button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(110, 168, 254, .3); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+  .btn.ghost { background: var(--surface); color: var(--fg); border-color: var(--line-strong); }
+  .btn:active:not(:disabled) { transform: scale(0.96); }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(79,70,229,.25); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
   @media (hover: hover) and (pointer: fine) {
-    button:not(:disabled):hover { background: #83b6ff; }
-    button.ghost:not(:disabled):hover { background: #20242c; border-color: #3a4150; }
+    .btn.primary:not(:disabled):hover { background: var(--accent-press); }
+    .btn.ghost:not(:disabled):hover { background: var(--raised); border-color: #d3d5dc; }
   }
-  .viewer { padding: 18px; overflow: auto; }
-  #drop {
-    border: 1.5px dashed var(--line); border-radius: 12px; padding: 40px; text-align: center; color: var(--muted); cursor: pointer;
-    transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+  .link {
+    background: none; border: 0; padding: 0; font: inherit; color: var(--accent); font-weight: 550;
+    cursor: pointer; align-self: flex-start; transition: color 120ms var(--ease-out);
   }
-  #drop.hot { border-color: var(--accent); color: var(--fg); background: #1a2230; }
-  @media (hover: hover) and (pointer: fine) { #drop:hover { border-color: #3a4150; color: var(--fg); } }
-  .stage { position: relative; display: inline-block; line-height: 0; cursor: crosshair; touch-action: none; }
-  .stage.enter { animation: stageIn 360ms var(--ease-out) both; }
-  .selbox { position: absolute; border: 1.5px solid var(--accent); background: rgba(110, 168, 254, .14); border-radius: 2px; pointer-events: none; }
-  .regionbar { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
-  .small { padding: 3px 10px; font-size: 12px; font-weight: 500; }
-  .stage canvas { border: 1px solid var(--line); border-radius: 6px; display: block; transition: opacity 360ms var(--ease-out); }
-  /* once curves are recovered, dim the source render so the extracted overlay reads as the hero (and you can
-     see it trace on); the dimmed original stays visible behind, proving the overlay lands on it. */
-  .stage.has-result canvas { opacity: 0.45; }
+  .link:hover { color: var(--accent-press); }
+  .actions { display: flex; flex-direction: column; gap: 9px; }
+
+  /* drop zone */
+  .drop {
+    border: 1.5px dashed var(--line-strong); border-radius: var(--r-ctl); padding: 16px; text-align: center; cursor: pointer;
+    transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out);
+  }
+  .drop strong { display: block; font-weight: 600; font-size: 13.5px; }
+  .drop span { font-size: 12px; color: var(--muted); }
+  .drop.hot, .drop:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+  /* viewer */
+  .viewer { padding: 16px; }
+  .pagebar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pagenav { width: 30px; height: 30px; padding: 0; font-size: 15px; line-height: 1; }
+  .stage { position: relative; display: inline-block; line-height: 0; max-width: 100%; }
+  .stage.enter { animation: stageIn 420ms var(--ease-out) both; }
+  .stage.ready { cursor: crosshair; touch-action: none; }
+  .stage canvas { display: block; outline: 1px solid rgba(0,0,0,.07); outline-offset: -1px; border-radius: 12px; transition: filter 420ms var(--ease-out), opacity 420ms var(--ease-out); }
+  .stage.has-result canvas { opacity: .82; filter: saturate(.32) contrast(.97); }  /* source recedes; bright overlay reads as the result */
   .stage svg { position: absolute; left: 0; top: 0; pointer-events: none; }
-  #overlay rect { transition: opacity 320ms var(--ease-out); }
-  .setqa { margin: 16px 0 10px; font-size: 13px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
-  .setqa.enter { animation: fadeIn 320ms var(--ease-out) both; }
+  .selbox { position: absolute; border: 1.5px solid var(--accent); background: rgba(79,70,229,.1); border-radius: 4px; pointer-events: none; }
+  .busy { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 48px 4px; justify-content: center; }
+  .busy.on { display: flex; }
+  .spinner { width: 17px; height: 17px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  .regionbar { display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .regionbar b { color: var(--fg); font-weight: 600; }
+
+  /* results */
+  .results { padding: 18px 20px 20px; }
+  .results.empty { display: none; }
+  .setqa { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .setqa b { color: var(--fg); font-weight: 600; }
   .warn { color: var(--warn); }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-  td.num { font-family: var(--mono); }
-  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 7px; border: 1px solid #0006; }
-  .pill { font-family: var(--mono); font-size: 12px; padding: 1px 7px; border-radius: 20px; }
-  .pill.ok { background: #173a28; color: var(--good); }
-  .pill.no { background: #3a1d1d; color: var(--bad); }
-  .hint { color: var(--muted); font-size: 12px; }
-  .pagebar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
-  .pagenav { padding: 3px 12px; font-size: 16px; line-height: 1.25; font-weight: 600; }
-  #pagesWrap { margin: 6px 0 18px; }
-  .subhead { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 7px; }
-  .subhead .hint { text-transform: none; letter-spacing: 0; }
+  .subhead { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin: 18px 0 8px; }
+  .subhead .hint { text-transform: none; letter-spacing: 0; margin-left: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 14px; }
+  #pages { margin-top: 0; }
+  th { text-align: left; padding: 8px 10px; color: var(--faint); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
+  td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 8px; outline: 1px solid rgba(0,0,0,.12); }
+  .pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+  .pill.ok { background: #e7f6ec; color: var(--good); }
+  .pill.no { background: #fdeaea; color: var(--bad); }
   #pages tbody tr { cursor: pointer; transition: background-color 120ms var(--ease-out); }
-  #pages tbody tr.active { background: #1a2230; }
-  @media (hover: hover) and (pointer: fine) { #pages tbody tr:hover { background: #20242c; } }
+  #pages tbody tr.active { background: var(--accent-soft); }
+  @media (hover: hover) and (pointer: fine) { #pages tbody tr:hover { background: var(--raised); } }
 
-  /* staggered table rows on first extraction */
-  tbody tr.row-in { animation: rowIn 320ms var(--ease-out) both; }
-
-  /* loading: a fast spinner reads as faster, even when the work takes the same time */
-  .busy { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 36px 4px; }
-  .busy.on { display: flex; }
-  .spinner { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
-
-  @keyframes stageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  tbody tr.row-in { animation: rowIn 360ms var(--ease-out) both; }
+  @keyframes stageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .fade-in { animation: fadeIn 360ms var(--ease-out) both; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-  /* reduced motion: keep the fades that aid comprehension, drop the movement */
   @media (prefers-reduced-motion: reduce) {
-    .stage.enter, tbody tr.row-in { animation: fadeIn 200ms ease both; }
+    .stage.enter, tbody tr.row-in, .fade-in { animation: fadeIn 240ms ease both; }
     #overlay polyline { transition: none !important; }
-    button:active:not(:disabled) { transform: none; }
+    .btn:active:not(:disabled) { transform: none; }
+  }
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: 1fr; }
+    .controls { position: static; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>GetMapped <span style="color:var(--muted);font-weight:400">— browser demo</span></h1>
-  <p>Drop a vector PDF plot. It runs entirely in your browser via <code>pdf.js</code> + the TypeScript port — no server, no upload.</p>
-</header>
-<main>
-  <aside class="controls">
-    <div>
-      <label for="prior">Shape prior</label>
-      <select id="prior">
-        <option value="free">free — no assumption</option>
-        <option value="lobe" selected>lobe — single-peaked</option>
-        <option value="monotone">monotone — one direction</option>
-        <option value="smooth">smooth — no spikes</option>
-      </select>
+<div class="app">
+  <header class="head">
+    <div class="brand">
+      <h1>GetMapped</h1>
+      <span class="badge">vector PDF</span>
     </div>
-    <div id="tolWrap">
-      <label for="tol">Tolerance</label>
-      <input id="tol" type="number" step="0.01" min="0" value="0.08" />
+    <p class="lede">Read curves straight off a vector PDF — calibrated, with overlapping ones pulled apart and a confidence score on each. Runs entirely in your browser; nothing is uploaded.</p>
+    <p class="note">Works on <b>vector</b> PDFs (real drawn paths). Scanned or raster images aren't supported.</p>
+  </header>
+
+  <div class="grid">
+    <aside class="panel controls">
+      <div class="field">
+        <label>Source</label>
+        <div id="drop" class="drop">
+          <strong>Drop a vector PDF</strong>
+          <span>or click to browse</span>
+          <input id="file" type="file" accept="application/pdf" hidden />
+        </div>
+        <button id="sample" class="link">Reload the sample</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label for="prior">Shape prior</label>
+        <select id="prior">
+          <option value="free">Free — no assumption</option>
+          <option value="lobe" selected>Lobe — single-peaked</option>
+          <option value="monotone">Monotone — one direction</option>
+          <option value="smooth">Smooth — no spikes</option>
+        </select>
+      </div>
+      <div class="field" id="tolWrap">
+        <label for="tol">Tolerance</label>
+        <input id="tol" type="number" step="0.01" min="0" value="0.08" />
+      </div>
+      <div class="field">
+        <label for="expected">Expected curves</label>
+        <input id="expected" type="number" min="0" step="1" value="0" />
+        <span class="hint">0 = auto (no cap)</span>
+      </div>
+      <div class="field">
+        <label for="orderby">Order by</label>
+        <select id="orderby">
+          <option value="peak-x" selected>Peak position</option>
+          <option value="mean-y">Mean height</option>
+          <option value="first-x">First x</option>
+        </select>
+      </div>
+      <label class="check"><input id="split" type="checkbox" /> Split shared-stroke lobes</label>
+
+      <div class="divider"></div>
+
+      <div class="actions">
+        <button id="csv" class="btn ghost" disabled>Download CSV</button>
+        <button id="extractall" class="btn ghost" hidden>Extract all pages</button>
+      </div>
+    </aside>
+
+    <div class="col">
+      <section class="panel viewer">
+        <div id="pagebar" class="pagebar" hidden>
+          <button id="prev" class="btn ghost pagenav" aria-label="Previous page">‹</button>
+          <span id="pagelabel">Page 1 / 1</span>
+          <button id="next" class="btn ghost pagenav" aria-label="Next page">›</button>
+        </div>
+        <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
+        <div id="stage" class="stage" hidden>
+          <canvas id="pdf"></canvas>
+          <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="selbox" class="selbox" hidden></div>
+        </div>
+        <div id="regionbar" class="regionbar" hidden>
+          <span id="regionmsg"></span>
+          <button id="wholepage" class="btn ghost pagenav" style="width:auto;height:30px;padding:0 12px;font-size:13px" hidden>Use whole page</button>
+        </div>
+      </section>
+
+      <section id="results" class="panel results empty">
+        <div id="setqa" class="setqa" hidden></div>
+        <div id="pagesWrap" hidden>
+          <div class="subhead">All pages <span class="hint">— click a row to view</span></div>
+          <table id="pages"><thead><tr>
+            <th>Page</th><th>Curves</th><th>Confidence</th><th>Crossings</th><th>Notes</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div id="tableWrap" hidden>
+          <table id="qa"><thead><tr>
+            <th>Curve</th><th>Points</th><th>Peak</th><th>Confidence</th><th>Violation</th><th>Monotonic</th><th>Status</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+      </section>
     </div>
-    <div>
-      <label for="expected">Expected curves</label>
-      <input id="expected" type="number" min="0" step="1" value="0" />
-      <div class="hint">0 = auto (no cap)</div>
-    </div>
-    <div>
-      <label for="orderby">Order by</label>
-      <select id="orderby">
-        <option value="peak-x" selected>peak-x</option>
-        <option value="mean-y">mean-y</option>
-        <option value="first-x">first-x</option>
-      </select>
-    </div>
-    <div class="row">
-      <input id="split" type="checkbox" />
-      <label for="split">Split shared-stroke lobes</label>
-    </div>
-    <button id="sample">Load sample plot</button>
-    <button id="rerun" class="ghost" disabled>Re-extract</button>
-    <button id="extractall" class="ghost" hidden>Extract all pages</button>
-    <button id="csv" class="ghost" disabled>Download CSV</button>
-  </aside>
-  <section class="viewer">
-    <div id="drop">
-      <strong>Drop a PDF here</strong> or click to choose
-      <input id="file" type="file" accept="application/pdf" hidden />
-    </div>
-    <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
-    <div id="pagebar" class="pagebar" hidden>
-      <button id="prev" class="ghost pagenav" aria-label="Previous page">‹</button>
-      <span id="pagelabel">Page 1 / 1</span>
-      <button id="next" class="ghost pagenav" aria-label="Next page">›</button>
-    </div>
-    <div id="stage" class="stage" hidden>
-      <canvas id="pdf"></canvas>
-      <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
-      <div id="selbox" class="selbox" hidden></div>
-    </div>
-    <div id="regionbar" class="regionbar" hidden>
-      <span id="regionmsg"></span>
-      <button id="wholepage" class="ghost small" hidden>Use whole page</button>
-    </div>
-    <div id="setqa" class="setqa" hidden></div>
-    <div id="pagesWrap" hidden>
-      <div class="subhead">All pages <span class="hint">— click a row to view</span></div>
-      <table id="pages"><thead><tr>
-        <th>page</th><th>curves</th><th>confidence</th><th>crossings</th><th>notes</th>
-      </tr></thead><tbody></tbody></table>
-    </div>
-    <div id="tableWrap" hidden>
-      <table id="qa"><thead><tr>
-        <th>curve</th><th>n</th><th>peak-x</th><th>conf</th><th>violation</th><th>x-mono</th><th>passed</th>
-      </tr></thead><tbody></tbody></table>
-    </div>
-  </section>
-</main>
+  </div>
+</div>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

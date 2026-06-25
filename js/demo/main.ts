@@ -17,7 +17,7 @@ const setqaEl = $("setqa"), tableWrap = $("tableWrap"), tbody = $<HTMLElement>("
 const priorSel = $<HTMLSelectElement>("prior"), tolInput = $<HTMLInputElement>("tol"), tolWrap = $("tolWrap");
 const expectedInput = $<HTMLInputElement>("expected"), orderSel = $<HTMLSelectElement>("orderby");
 const splitCb = $<HTMLInputElement>("split");
-const rerunBtn = $<HTMLButtonElement>("rerun"), csvBtn = $<HTMLButtonElement>("csv"), sampleBtn = $<HTMLButtonElement>("sample");
+const csvBtn = $<HTMLButtonElement>("csv"), sampleBtn = $<HTMLButtonElement>("sample"), results = $("results");
 const busy = $("busy");
 const pagebar = $("pagebar"), pageLabel = $("pagelabel");
 const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
@@ -58,7 +58,8 @@ async function renderPage(i: number): Promise<void> {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(i + 1);   // pdf.js pages are 1-based
   const unscaled = page.getViewport({ scale: 1 });
-  renderScale = Math.min(2, Math.max(0.6, 900 / unscaled.width)); // fit ~900px wide, clamp
+  const avail = Math.max(320, (stage.parentElement?.clientWidth ?? 800) - 32); // fit the viewer (minus padding)
+  renderScale = Math.min(2, Math.max(0.5, avail / unscaled.width));
   const viewport = page.getViewport({ scale: renderScale });
   pdfCanvas.width = Math.ceil(viewport.width);
   pdfCanvas.height = Math.ceil(viewport.height);
@@ -69,7 +70,8 @@ async function renderPage(i: number): Promise<void> {
   const ctx = pdfCanvas.getContext("2d")!;
   await page.render({ canvasContext: ctx, viewport }).promise;
   stage.hidden = false;
-  replayAnim(stage, "enter");   // loading a new PDF is occasional — a gentle entrance fits
+  stage.classList.add("ready");   // enable the drag-to-select cursor
+  replayAnim(stage, "enter");     // loading a new PDF is occasional — a gentle entrance fits
 }
 
 function curveColor(c: CurveSet["curves"][number], i: number): string {
@@ -123,6 +125,7 @@ function peakX(c: CurveSet["curves"][number]): number {
 }
 
 function fillTable(cs: CurveSet, animate: boolean): void {
+  results.classList.remove("empty");
   setqaEl.hidden = false;
   const w = cs.qa.warnings.length ? `<span class="warn">⚠ ${cs.qa.warnings.join("; ")}</span>` : "clean";
   setqaEl.innerHTML =
@@ -131,7 +134,7 @@ function fillTable(cs: CurveSet, animate: boolean): void {
     `<span>crossings <b>${cs.qa.crossings}</b></span>` +
     `<span>x-axis r <b>${cs.xAxis.r.toFixed(4)}</b> · y-axis r <b>${cs.yAxis.r.toFixed(4)}</b></span>` +
     `<span>${w}</span>`;
-  if (animate && !reduceMotion) replayAnim(setqaEl, "enter");
+  if (animate && !reduceMotion) replayAnim(setqaEl, "fade-in");
   tableWrap.hidden = false;
   tbody.replaceChildren();
   cs.curves.forEach((c, i) => {
@@ -176,6 +179,7 @@ async function run(animate = false): Promise<void> {
     fillTable(cs, animate);
     csvBtn.disabled = false;
   } catch (e) {
+    results.classList.remove("empty");
     setqaEl.hidden = false;
     setqaEl.innerHTML = `<span class="warn">extract failed: ${e instanceof Error ? e.message : String(e)}</span>`;
     tableWrap.hidden = true;
@@ -187,8 +191,6 @@ async function run(animate = false): Promise<void> {
 
 async function load(data: Uint8Array): Promise<void> {
   pdfData = data;
-  rerunBtn.disabled = false;
-  drop.hidden = true;
   clearAllPages();
   busy.classList.add("on");
   try {
@@ -379,7 +381,6 @@ wholepageBtn.addEventListener("click", () => {
 // changing options re-extracts the current page; any all-pages summary is now stale, so drop it.
 priorSel.addEventListener("change", () => { tolWrap.hidden = priorSel.value === "free"; clearAllPages(); void run(); });
 [tolInput, expectedInput, orderSel, splitCb].forEach((el) => el.addEventListener("change", () => { clearAllPages(); void run(); }));
-rerunBtn.addEventListener("click", () => void run());
 prevBtn.addEventListener("click", () => void goToPage(pageIndex - 1));
 nextBtn.addEventListener("click", () => void goToPage(pageIndex + 1));
 extractAllBtn.addEventListener("click", () => void extractAll());
@@ -396,10 +397,11 @@ drop.addEventListener("drop", async (e) => {
   const f = e.dataTransfer?.files?.[0];
   if (f) await load(new Uint8Array(await f.arrayBuffer()));
 });
-sampleBtn.addEventListener("click", async () => {
+async function loadSample(): Promise<void> {
   const buf = await (await fetch("./sample.pdf")).arrayBuffer();
   await load(new Uint8Array(buf));   // auto curve count: the sample is colour-keyed, separated by style
-});
+}
+sampleBtn.addEventListener("click", () => void loadSample());
 csvBtn.addEventListener("click", () => {
   const csv = allSets ? toCsvAll(allSets) : lastSet ? toCsv(lastSet) : null;
   if (!csv) return;
@@ -410,3 +412,6 @@ csvBtn.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(a.href);
 });
+
+// open with a result already on screen so the demo reads as a working app, not an empty shell
+void loadSample().catch(() => { /* offline / no sample: the drop zone is still there */ });
