@@ -1,7 +1,5 @@
 # unplot
 
-*Here for the plot.*
-
 **Read curves off a plot, straight from the vector PDF, with overlapping curves pulled apart and a confidence score on each.**
 
 unplot is a headless library (Python and TypeScript) for digitizing line and curve plots. Interactive tools like WebPlotDigitizer, Engauge, and PlotDigitizer want you to load an image and click to calibrate the axes. unplot runs unattended instead, and does two things those tools don't:
