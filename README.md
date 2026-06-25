@@ -2,6 +2,8 @@
 
 **Read curves off a plot, straight from the vector PDF, with overlapping curves pulled apart and a confidence score on each.**
 
+**[Try the live demo →](https://somnai-dreams.github.io/unplot/)** — drop a vector PDF in your browser; nothing is uploaded.
+
 unplot is a headless library (Python and TypeScript) for digitizing line and curve plots. Interactive tools like WebPlotDigitizer, Engauge, and PlotDigitizer want you to load an image and click to calibrate the axes. unplot runs unattended instead, and does two things those tools don't:
 
 - **Vector-PDF-native.** When a PDF's curves are real drawn paths, unplot reads the exact geometry out of the file. No rasterizing, no pixel re-detection, no clicking. The numbers you get back are the numbers that were drawn.
