@@ -26,11 +26,6 @@ export function argmax(a: number[]): number {
   for (let i = 1; i < a.length; i++) if (a[i]! > a[k]!) k = i;
   return k;
 }
-export function argmin(a: number[]): number {
-  let k = 0;
-  for (let i = 1; i < a.length; i++) if (a[i]! < a[k]!) k = i;
-  return k;
-}
 
 /** First difference: out[i] = a[i+1] - a[i]. */
 export const diff = (a: number[]): number[] => a.slice(1).map((x, i) => x - a[i]!);

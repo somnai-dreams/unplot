@@ -150,7 +150,7 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
   // (e.g. render the same PDF and extract() from it without the buffer going detached).
   const doc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
   const page = await doc.getPage(pageNum + 1);
-  const view = page.view as number[]; // [x0,y0,x1,y1] in pt
+  const view = page.view; // [x0,y0,x1,y1] in pt
   const H = view[3]! - view[1]!;
   const ops = await page.getOperatorList();
 
@@ -164,16 +164,16 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
 
   for (let k = 0; k < ops.fnArray.length; k++) {
     const fn = ops.fnArray[k];
-    const args = ops.argsArray[k];
+    const args = ops.argsArray[k] as unknown[]; // pdf.js types these as any; narrow per-op below
     if (fn === OPS.save) stack.push({ ctm, color: strokeColor, dash, width });
     else if (fn === OPS.restore) { const s = stack.pop(); if (s) ({ ctm, color: strokeColor, dash, width } = s); }
-    else if (fn === OPS.transform) ctm = mul(ctm, args as Mat);
-    else if (fn === OPS.setLineWidth) width = args[0];
+    else if (fn === OPS.transform) ctm = mul(ctm, args as unknown as Mat);
+    else if (fn === OPS.setLineWidth) width = args[0] as number;
     else if (fn === OPS.setStrokeRGBColor) strokeColor = rgbObj(args).map((c) => c / 255) as [number, number, number];
-    else if (fn === OPS.setDash) dash = args[0];
+    else if (fn === OPS.setDash) dash = args[0] as number[] | null;
     else if (fn === OPS.constructPath) {
       // a path may be built by several constructPath ops before it's painted — accumulate, don't overwrite
-      if (!pending) pending = { subOps: [], coords: [] };
+      pending ??= { subOps: [], coords: [] };
       pending.subOps.push(...(args[0] as number[]));
       pending.coords.push(...(args[1] as number[]));
     } else if (fn === OPS.fill || fn === OPS.eoFill || fn === OPS.endPath) pending = null; // discard non-stroked paths
@@ -201,10 +201,11 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
   const words: Word[] = [];
   for (const item of tc.items as TextItemLite[]) {
     const transform = item.transform;
-    if (!item.str || !item.str.trim() || !transform) continue;
+    const text = item.str?.trim() ?? "";
+    if (text === "" || !transform) continue;
     const e = transform[4]!, f = transform[5]!;
     const w = item.width ?? 0, h = item.height ?? 8;
-    words.push({ x0: e, y0: H - (f + h), x1: e + w, y1: H - f, text: item.str.trim() });
+    words.push({ x0: e, y0: H - (f + h), x1: e + w, y1: H - f, text });
   }
   return { paths, words, rect: [view[0]!, 0, view[2]!, H] };
 }

@@ -117,7 +117,7 @@ export function robustFit(anchors: Anchors): [number, number, number, number] {
 export function calibrateAxis(
   words: Word[], frame: [number, number, number, number], axis: "x" | "y", explicit?: Anchors,
 ): AxisCalibration {
-  let anchors = explicit !== undefined ? explicit : axisLabelAnchors(words, frame, axis);
+  let anchors = explicit ?? axisLabelAnchors(words, frame, axis);
   anchors = unfoldSymmetric(anchors, axis);
   const [scale, offset, r, nDropped] = robustFit(anchors);
   return {

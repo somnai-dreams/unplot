@@ -18,5 +18,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "build-demo.ts"]
 }

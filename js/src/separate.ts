@@ -62,7 +62,7 @@ export function separate(
   const nStyles = new Set(rawpaths.map(styleKey)).size;
   let method = opts.method ?? "auto";
   if (method === "auto") {
-    if (expectedCurves && nStyles >= expectedCurves) method = "style";
+    if (expectedCurves != null && nStyles >= expectedCurves) method = "style";
     else if (expectedCurves == null && nStyles > 1) method = "style";
     else method = "defan";
   }

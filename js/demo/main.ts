@@ -188,13 +188,13 @@ function setHighlight(c: string | null): void {
 function wireHover(svg: SVGElement): void {
   svg.addEventListener("mousemove", (e) => {
     const el = e.target as Element;
-    const x = el.getAttribute?.("data-x");
+    const x = el.getAttribute("data-x");
     if (x != null) {
       tip.innerHTML = `<span class="k">x</span> ${x}&nbsp;&nbsp;<span class="k">y</span> ${el.getAttribute("data-y")}`;
       tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 14}px`;
       tip.hidden = false;
     } else tip.hidden = true;
-    setHighlight(el.getAttribute?.("data-c") ?? null);
+    setHighlight(el.getAttribute("data-c"));
   });
   svg.addEventListener("mouseleave", () => { tip.hidden = true; setHighlight(null); });
 }
@@ -457,7 +457,7 @@ function updateRegionBar(): void {
 }
 
 stage.addEventListener("pointerdown", (e) => {
-  if (!pdfDoc || stage.hidden) return;
+  if (pdfDoc == null || stage.hidden === true) return;
   selecting = true; dragged = false; selStart = localXY(e);
   try { stage.setPointerCapture(e.pointerId); } catch { /* pointer may not be capturable */ }
 });
@@ -511,7 +511,7 @@ drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.ad
 drop.addEventListener("dragleave", () => drop.classList.remove("hot"));
 drop.addEventListener("drop", async (e) => {
   e.preventDefault(); drop.classList.remove("hot");
-  const f = e.dataTransfer?.files?.[0];
+  const f = e.dataTransfer?.files[0];
   if (f) await load(new Uint8Array(await f.arrayBuffer()));
 });
 async function loadSample(): Promise<void> {
@@ -521,7 +521,7 @@ async function loadSample(): Promise<void> {
 sampleBtn.addEventListener("click", () => void loadSample());
 csvBtn.addEventListener("click", () => {
   const csv = allSets ? toCsvAll(allSets) : lastSet ? toCsv(lastSet) : null;
-  if (!csv) return;
+  if (csv == null) return;
   const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);

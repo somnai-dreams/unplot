@@ -17,6 +17,6 @@ describe("pdf.js vector adapter", () => {
 
     // numeric tick labels recovered for axis calibration
     const nums = pg.words.filter((w) => /^-?\d+(\.\d+)?$/.test(w.text)).map((w) => w.text);
-    expect(nums).toEqual(expect.arrayContaining(["400", "700", "0", "2"]));
+    for (const want of ["400", "700", "0", "2"]) expect(nums).toContain(want);
   });
 });

@@ -41,7 +41,7 @@ function isValleyJoin(cur: Pt[], t: Pt[], k = 8, margin = 2.0): boolean {
  *  join so two adjacent lobes meeting at the baseline are not merged into one full-width curve. */
 export function chainCurves(segs: Pt[][], xtol = 4, ytol = 6): Pt[][] {
   const s = [...segs].sort((a, b) => a[0]![0] - b[0]![0]);
-  const used = new Array(s.length).fill(false);
+  const used: boolean[] = new Array<boolean>(s.length).fill(false);
   const curves: Pt[][] = [];
   for (let i = 0; i < s.length; i++) {
     if (used[i]) continue;

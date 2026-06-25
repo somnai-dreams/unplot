@@ -62,7 +62,7 @@ function buildCurves(
   // Confidence-aware selection: keep the `expectedCurves` best by confidence * amplitude. A real curve scores
   // high on BOTH; a tall malformed fragment has confidence ~0, and a tiny degenerate stub has amplitude ~0, so
   // either failure mode scores ~0 and can't displace a genuine lobe. (Selecting by amplitude alone was the bug.)
-  if (expectedCurves && built.length > expectedCurves) {
+  if (expectedCurves != null && built.length > expectedCurves) {
     built = [...built].sort((a, b) => b.qa.confidence * amplitude(b.pdata) - a.qa.confidence * amplitude(a.pdata));
     built = built.slice(0, expectedCurves);
   }
@@ -99,7 +99,7 @@ export function extractFromPage(page: VectorPage, opts: ExtractOpts = {}): Curve
   const warnings: string[] = [];
   if (Math.abs(xCal.r) < 0.999 || Math.abs(yCal.r) < 0.999)
     warnings.push(`axis fit r below 0.999 (x=${xCal.r.toFixed(4)}, y=${yCal.r.toFixed(4)})`);
-  if (expectedCurves && curves.length !== expectedCurves)
+  if (expectedCurves != null && curves.length !== expectedCurves)
     warnings.push(`expected ${expectedCurves} curves, recovered ${curves.length}`);
   const source: Source = {
     path: opts.path ?? "<buffer>", ingest: "vector",
