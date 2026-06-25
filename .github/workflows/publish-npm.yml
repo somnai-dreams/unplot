@@ -38,4 +38,6 @@ jobs:
       - name: Publish (trusted)
         run: |
           npm install -g npm@latest   # trusted publishing needs npm >= 11.5.1
-          npm publish
+          echo "node $(node -v) / npm $(npm -v)"
+          echo "OIDC token endpoint present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+          npm publish --loglevel verbose
