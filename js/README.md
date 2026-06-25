@@ -10,12 +10,12 @@ recovery) → de-fan / chain / split (`src/curves/vectorpaths.ts`, with the vall
 separation (`src/separate.ts`) → shape QA + confidence (`src/qa/*.ts`, `src/priors.ts`) → `extract()`
 (`src/extract.ts`). Everything but pdf.js is dependency-free array math. Raster ingest is not yet ported.
 
-`npm test` runs the suite: the pdf.js adapter recovery, the curve-geometry guards, an end-to-end
+`bun test` runs the suite: the pdf.js adapter recovery, the curve-geometry guards, an end-to-end
 `extract()` on a synthetic colour-keyed fixture, and folded-axis calibration parity.
 
 ```
-npm install
-npm test
+bun install
+bun test
 ```
 
 ## Usage
@@ -44,8 +44,8 @@ never leave the page. The bundled sample is a 4-page synthetic set, the last pag
 (`demo/make_sample.py`).
 
 ```
-npm run build:demo      # bundles app + pdf.js worker into demo/dist/ (GitHub Pages-ready)
-npm run serve:demo      # serves demo/dist/ at http://localhost:8099
+bun run build:demo      # bundles app + pdf.js worker into demo/dist/ (GitHub Pages-ready)
+bun run serve:demo      # serves demo/dist/ at http://localhost:8099
 ```
 
 `demo/dist/` is a build artifact (git-ignored); rebuild it on deploy. The bundled `pdf.worker.js` is large

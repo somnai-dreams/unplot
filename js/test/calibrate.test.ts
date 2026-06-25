@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { calibrateAxis, robustFit, unfoldSymmetric, type Anchors } from "../src/axes/calibrate.ts";
 
 describe("axis calibration (folded-axis port)", () => {

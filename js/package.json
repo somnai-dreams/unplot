@@ -1,26 +1,21 @@
 {
   "name": "unplot",
   "version": "0.0.1",
-  "main": "index.js",
+  "module": "src/index.ts",
+  "type": "module",
+  "license": "MIT",
+  "description": "Read curves off a vector PDF — calibrated data + QA. Browser/TS port of the unplot Python package.",
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "build:demo": "node build-demo.mjs",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.demo.json",
+    "build:demo": "bun build-demo.ts",
     "serve:demo": "python3 demo/serve.py"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "type": "module",
   "dependencies": {
     "pdfjs-dist": "^4.10.38"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9",
-    "esbuild": "^0.28.1"
+    "@types/bun": "latest",
+    "typescript": "^6.0.3"
   }
 }

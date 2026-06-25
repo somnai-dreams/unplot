@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { monoXSegments, chainCurves, splitLobes, type Pt } from "../src/curves/vectorpaths.ts";
 
 describe("vectorpaths (TS port)", () => {

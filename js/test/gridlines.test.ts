@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { extract } from "../src/extract.ts";
 import { lobe } from "../src/priors.ts";

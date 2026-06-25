@@ -106,13 +106,13 @@ pip install unplot            # vector-PDF core + numpy
 pip install "unplot[raster]"  # adds opencv/pillow for the raster fallback
 ```
 
-TypeScript: the port lives in [`js/`](js/). Run `npm install` there; the only runtime dependency is pdf.js (`pdfjs-dist`, Apache-2.0).
+TypeScript: the port lives in [`js/`](js/). Run `bun install` there; the only runtime dependency is pdf.js (`pdfjs-dist`, Apache-2.0).
 
 ## Tests
 
 ```bash
 pip install "unplot[test]" && pytest   # Python
-cd js && npm test                          # TypeScript
+cd js && bun test                           # TypeScript
 ```
 
 Both suites build synthetic plots with known ground truth and assert the recovered curves and calibration match. No copyrighted source documents are redistributed.
