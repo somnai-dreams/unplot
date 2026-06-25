@@ -4,6 +4,13 @@
   "type": "module",
   "license": "MIT",
   "description": "Read curves off a vector PDF — calibrated data + QA. Browser/TS port of the unplot Python package.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/somnai-dreams/unplot.git",
+    "directory": "js"
+  },
+  "homepage": "https://github.com/somnai-dreams/unplot#readme",
+  "bugs": "https://github.com/somnai-dreams/unplot/issues",
   "module": "src/index.ts",
   "types": "./src/index.ts",
   "exports": {

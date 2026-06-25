@@ -1,0 +1,39 @@
+name: Publish to npm
+
+# Trusted publishing (OIDC): no NPM_TOKEN secret. npmjs.com is configured to
+# trust this repo + workflow, and mints a short-lived credential at run time.
+# Provenance is attached automatically (needs id-token: write + the package.json
+# `repository` field). Configure the trusted publisher on npmjs.com first:
+#   unplot → Settings → Trusted Publisher → GitHub Actions
+#     org/user: somnai-dreams   repo: unplot   workflow: publish-npm.yml
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm trusted publishing
+    defaults:
+      run:
+        working-directory: js
+    steps:
+      - uses: actions/checkout@v4
+
+      # Verify before we ship — same toolchain as the rest of CI.
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Publish (trusted)
+        run: |
+          npm install -g npm@latest   # trusted publishing needs npm >= 11.5.1
+          npm publish
