@@ -6,7 +6,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:demo": "node build-demo.mjs",
-    "serve:demo": "python3 -m http.server -d demo/dist 8099"
+    "serve:demo": "python3 demo/serve.py"
   },
   "keywords": [],
   "author": "",
