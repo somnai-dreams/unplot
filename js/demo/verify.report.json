@@ -1,6 +1,8 @@
 {
   "phase": "ready",
   "numPages": 4,
+  "skeletonHeight": 975,
+  "loadedHeight": 975,
   "page1Overlay": 3,
   "page1Data": 3,
   "clearedOnNav": true,
@@ -10,6 +12,7 @@
     "page reached phase:ready": true,
     "sample produced curves on the source overlay": true,
     "sample produced curves in the data panel": true,
+    "no layout shift on load (skeleton height == loaded height)": true,
     "overlay cleared synchronously on page change": true,
     "overlay repopulated for the new page": true,
     "hover resolved a point value from state": true

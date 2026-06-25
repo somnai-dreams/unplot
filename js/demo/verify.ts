@@ -15,6 +15,8 @@ type VerifyReport = {
   phase: "loading" | "ready" | "error";
   requestId: string;
   numPages?: number;
+  skeletonHeight?: number;
+  loadedHeight?: number;
   page1Overlay?: number;
   page1Data?: number;
   clearedOnNav?: boolean;
@@ -70,6 +72,7 @@ const server = Bun.serve({
 
 const chrome = spawn([
   CHROME, "--headless=new", `--remote-debugging-port=${CDP_PORT}`, "--remote-debugging-address=127.0.0.1",
+  "--window-size=1280,900", // pin a desktop viewport (above the 920px responsive breakpoint) for determinism
   "--no-first-run", "--no-default-browser-check", "--disable-gpu", `--user-data-dir=/tmp/unplot-verify-${requestId}`,
   "about:blank",
 ], { stdout: "ignore", stderr: "ignore" });
@@ -107,6 +110,7 @@ try {
     ["page reached phase:ready", report.phase === "ready"],
     ["sample produced curves on the source overlay", (report.page1Overlay ?? 0) > 0],
     ["sample produced curves in the data panel", (report.page1Data ?? 0) > 0],
+    ["no layout shift on load (skeleton height == loaded height)", Math.abs((report.skeletonHeight ?? 0) - (report.loadedHeight ?? -1)) <= 2],
     ["overlay cleared synchronously on page change", report.clearedOnNav === true],
     ["overlay repopulated for the new page", (report.page2Overlay ?? 0) > 0],
     ["hover resolved a point value from state", /x\s+\S+\s+y\s+\S+/i.test(report.hoverTip ?? "")],

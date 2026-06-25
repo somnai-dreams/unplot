@@ -12,6 +12,7 @@
     --line: #ececf0; --line-strong: #e2e3e8;
     --accent: #4f46e5; --accent-press: #4338ca; --accent-soft: #eef0fe;
     --good: #16a34a; --warn: #b45309; --bad: #dc2626;
+    --sk: #e9ebef;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --shadow-sm: 0 1px 2px rgba(24,24,27,.05), 0 1px 3px rgba(24,24,27,.04);
@@ -88,8 +89,9 @@
   .drop span { font-size: 12px; color: var(--muted); }
   .drop.hot, .drop:hover { border-color: var(--accent); background: var(--accent-soft); }
 
-  /* panel header (shared by viewer + data) */
-  .panelhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+  /* panel header (shared by viewer + data) — min-height reserves room for the page nav so it never grows the
+     header when it appears after load */
+  .panelhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 53px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
   .panelhead .ttl { font-size: 12px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
   .panelbody { padding: 14px 16px 16px; }
 
@@ -97,8 +99,11 @@
   .pagenav { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .pagebtn { width: 26px; height: 26px; padding: 0; font-size: 14px; line-height: 1; }
   /* reserve the plot box from first paint (default = the auto-loaded sample's page ratio; JS sets --stage-ar
-     per page) so the async render fills reserved space instead of growing the panel and shifting layout */
-  .stagewrap { display: flex; justify-content: center; align-items: center; width: 100%; aspect-ratio: var(--stage-ar, 1.5); }
+     per page) so the async render fills reserved space instead of growing the panel and shifting layout.
+     .loading paints a skeleton in that reserved box until the canvas arrives. */
+  .stagewrap { position: relative; display: flex; justify-content: center; align-items: center; width: 100%; aspect-ratio: var(--stage-ar, 1.5); border-radius: 10px; }
+  .stagewrap.loading { background: var(--sk); overflow: hidden; }
+  .stagewrap.loading::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: shimmer 1.5s var(--ease-out) infinite; }
   .stage { position: relative; display: inline-block; line-height: 0; max-width: 100%; max-height: 100%; }
   .stage.ready { cursor: crosshair; touch-action: none; }
   .stage canvas { display: block; max-width: 100%; height: auto; outline: 1px solid rgba(0,0,0,.07); outline-offset: -1px; border-radius: 10px; transition: filter 340ms var(--ease-out); }
@@ -116,8 +121,12 @@
   .regionbar b { color: var(--fg); font-weight: 600; }
 
   /* extracted data */
-  /* reserve the data plot's box too (default = sample page 1; JS sets --data-ar from the rendered viewBox) */
-  #dataplot { width: 100%; height: auto; display: block; aspect-ratio: var(--data-ar, 1.5385); }
+  /* reserve the data plot's box too (default = sample page 1; JS sets --data-ar from the rendered viewBox),
+     and skeleton it while loading — same recipe as the source plot */
+  #datawrap { position: relative; width: 100%; aspect-ratio: var(--data-ar, 1.5385); border-radius: 10px; }
+  #datawrap.loading { background: var(--sk); overflow: hidden; }
+  #datawrap.loading::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: shimmer 1.5s var(--ease-out) infinite; }
+  #dataplot { width: 100%; height: 100%; display: block; }
   /* hover a point/line: raise that curve above the others and fade the rest, so distinct traces are visible
      even where the curves merge into one line */
   #dataplot .curve, #overlay .curve { transition: opacity 130ms var(--ease-out); }
@@ -127,7 +136,13 @@
 
   /* results */
   .results { padding: 16px 18px 18px; }
-  .results.empty { display: none; }
+  /* skeleton shown from first paint so the QA grid reserves its space instead of popping in on load */
+  .sk-bar { display: inline-block; background: var(--sk); border-radius: 5px; position: relative; overflow: hidden; vertical-align: middle; }
+  .sk-bar::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); animation: shimmer 1.5s var(--ease-out) infinite; }
+  .sksetqa { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; height: 20px; }
+  .sksetqa .sk-bar { height: 13px; }
+  .skrow td { padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  .skrow:last-child td { border-bottom: 0; }
   .setqa { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .setqa b { color: var(--fg); font-weight: 600; }
   .warn { color: var(--warn); }
@@ -156,7 +171,11 @@
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes rowIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .fade-in, tbody tr.row-in { animation: fadeIn 220ms ease both; } .btn:active:not(:disabled) { transform: none; } }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in, tbody tr.row-in { animation: fadeIn 220ms ease both; } .btn:active:not(:disabled) { transform: none; }
+    .stagewrap.loading::after, #datawrap.loading::after, .sk-bar::after { animation: none; }
+  }
   @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .controls { position: static; } .duo { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -227,15 +246,15 @@
           </div>
           <div class="panelbody">
             <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
-            <div id="stagewrap" class="stagewrap">
+            <div id="stagewrap" class="stagewrap loading">
               <div id="stage" class="stage" hidden>
                 <canvas id="pdf"></canvas>
                 <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
                 <div id="selbox" class="selbox" hidden></div>
               </div>
             </div>
-            <div id="regionbar" class="regionbar" hidden>
-              <span id="regionmsg"></span>
+            <div id="regionbar" class="regionbar">
+              <span id="regionmsg"><span class="hint">Multi-plot page? Drag a box around one plot's axes (tick labels just outside) to extract only that plot.</span></span>
               <button id="wholepage" class="btn ghost pagebtn" style="width:auto;height:26px;padding:0 10px;font-size:12.5px" hidden>Use whole page</button>
             </div>
           </div>
@@ -247,13 +266,27 @@
             <span class="hint">re-drawn from the numbers · hover a point</span>
           </div>
           <div class="panelbody">
-            <svg id="dataplot" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="datawrap" class="loading">
+              <svg id="dataplot" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
             <div id="dataEmpty" class="empty-note" hidden>No curves recovered.</div>
           </div>
         </section>
       </div>
 
-      <section id="results" class="panel results empty">
+      <section id="results" class="panel results">
+        <!-- skeleton reserves the QA grid from first paint (sample = 3 curves); JS hides it on the first result -->
+        <div id="resultsSkeleton">
+          <div class="sksetqa">
+            <span class="sk-bar" style="width:108px"></span><span class="sk-bar" style="width:64px"></span>
+            <span class="sk-bar" style="width:74px"></span><span class="sk-bar" style="width:150px"></span>
+          </div>
+          <table><thead><tr><th>Curve</th><th>Points</th><th>Peak</th><th>Confidence</th><th>Violation</th><th>Monotonic</th><th>Status</th></tr></thead><tbody>
+            <tr class="skrow"><td><span class="sk-bar" style="width:46px;height:11px"></span></td><td><span class="sk-bar" style="width:28px;height:11px"></span></td><td><span class="sk-bar" style="width:34px;height:11px"></span></td><td><span class="sk-bar" style="width:30px;height:11px"></span></td><td><span class="sk-bar" style="width:54px;height:11px"></span></td><td><span class="sk-bar" style="width:24px;height:11px"></span></td><td><span class="sk-bar" style="width:42px;height:18px"></span></td></tr>
+            <tr class="skrow"><td><span class="sk-bar" style="width:46px;height:11px"></span></td><td><span class="sk-bar" style="width:28px;height:11px"></span></td><td><span class="sk-bar" style="width:34px;height:11px"></span></td><td><span class="sk-bar" style="width:30px;height:11px"></span></td><td><span class="sk-bar" style="width:54px;height:11px"></span></td><td><span class="sk-bar" style="width:24px;height:11px"></span></td><td><span class="sk-bar" style="width:42px;height:18px"></span></td></tr>
+            <tr class="skrow"><td><span class="sk-bar" style="width:46px;height:11px"></span></td><td><span class="sk-bar" style="width:28px;height:11px"></span></td><td><span class="sk-bar" style="width:34px;height:11px"></span></td><td><span class="sk-bar" style="width:30px;height:11px"></span></td><td><span class="sk-bar" style="width:54px;height:11px"></span></td><td><span class="sk-bar" style="width:24px;height:11px"></span></td><td><span class="sk-bar" style="width:42px;height:18px"></span></td></tr>
+          </tbody></table>
+        </div>
         <div id="setqa" class="setqa" hidden></div>
         <div id="pagesWrap" hidden>
           <div class="subhead">All pages <span class="hint">— click a row to view</span></div>

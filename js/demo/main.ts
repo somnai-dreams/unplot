@@ -17,7 +17,7 @@ const setqaEl = $("setqa"), tableWrap = $("tableWrap"), tbody = $<HTMLElement>("
 const priorSel = $<HTMLSelectElement>("prior"), tolInput = $<HTMLInputElement>("tol"), tolWrap = $("tolWrap");
 const expectedInput = $<HTMLInputElement>("expected"), orderSel = $<HTMLSelectElement>("orderby");
 const splitCb = $<HTMLInputElement>("split");
-const csvBtn = $<HTMLButtonElement>("csv"), sampleBtn = $<HTMLButtonElement>("sample"), results = $("results");
+const csvBtn = $<HTMLButtonElement>("csv"), sampleBtn = $<HTMLButtonElement>("sample");
 const busy = $("busy");
 const pagebar = $("pagebar"), pageLabel = $("pagelabel");
 const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
@@ -25,6 +25,7 @@ const pagesWrap = $("pagesWrap"), pagesBody = $<HTMLElement>("pages").querySelec
 const selbox = $("selbox"), regionbar = $("regionbar"), regionmsg = $("regionmsg"), wholepageBtn = $<HTMLButtonElement>("wholepage");
 const stagewrap = $("stagewrap");
 const dataplot = $<SVGSVGElement>("dataplot"), dataEmpty = $("dataEmpty"), tip = $("tip");
+const datawrap = $("datawrap"), resultsSkeleton = $("resultsSkeleton");
 
 type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 const NS = "http://www.w3.org/2000/svg";
@@ -76,6 +77,7 @@ async function renderPage(i: number): Promise<void> {
   const ctx = pdfCanvas.getContext("2d")!;
   await page.render({ canvasContext: ctx, viewport }).promise;
   stage.hidden = false;
+  stagewrap.classList.remove("loading");   // canvas is up — drop the skeleton shimmer
   stage.classList.add("ready");   // enable the drag-to-select cursor
   replayAnim(stage, "enter");     // loading a new PDF is occasional — a gentle entrance fits
 }
@@ -124,6 +126,7 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
  *  the tool produced DATA, not a copy of the PDF image. Matches the source plot's axis range (the calibration
  *  anchors, extended to the data) AND its aspect ratio, so it reads as the SAME curves. Points are hoverable. */
 function renderDataPlot(cs: CurveSet, animate: boolean): void {
+  datawrap.classList.remove("loading");   // first result in — drop the skeleton shimmer
   const pts = cs.curves.flatMap((c) => c.points);
   if (!pts.length) { dataplot.replaceChildren(); dataplot.removeAttribute("viewBox"); dataEmpty.hidden = false; return; }
   dataEmpty.hidden = true;
@@ -159,7 +162,7 @@ function renderDataPlot(cs: CurveSet, animate: boolean): void {
     p.push(`</g>`);
   });
   dataplot.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  dataplot.style.setProperty("--data-ar", String(W / H));   // reserve the box at the plot's exact ratio
+  datawrap.style.setProperty("--data-ar", String(W / H));   // reserve the box at the plot's exact ratio
   dataplot.innerHTML = p.join("");
   lastHi = "";
   if (animate && !reduceMotion) {   // the re-plot is on white, so a left-to-right reveal actually shows
@@ -216,7 +219,7 @@ function peakX(c: CurveSet["curves"][number]): number {
 }
 
 function fillTable(cs: CurveSet, animate: boolean): void {
-  results.classList.remove("empty");
+  resultsSkeleton.hidden = true;   // first result — replace the skeleton with the real grid
   setqaEl.hidden = false;
   const w = cs.qa.warnings.length ? `<span class="warn">⚠ ${cs.qa.warnings.join("; ")}</span>` : "clean";
   setqaEl.innerHTML =
@@ -271,12 +274,13 @@ async function run(animate = false): Promise<void> {
     fillTable(cs, animate);
     csvBtn.disabled = false;
   } catch (e) {
-    results.classList.remove("empty");
+    resultsSkeleton.hidden = true;
     setqaEl.hidden = false;
     setqaEl.innerHTML = `<span class="warn">extract failed: ${e instanceof Error ? e.message : String(e)}</span>`;
     tableWrap.hidden = true;
     overlay.replaceChildren();
     stage.classList.remove("desat");
+    datawrap.classList.remove("loading");
     dataplot.replaceChildren(); dataplot.removeAttribute("viewBox"); dataEmpty.hidden = false;
     csvBtn.disabled = true;
   }
@@ -548,6 +552,8 @@ type VerifyReport = {
   phase: "loading" | "ready" | "error";
   requestId: string;
   numPages?: number;
+  skeletonHeight?: number; // document height at first paint (skeleton reserves the loaded layout)
+  loadedHeight?: number;   // document height once the sample is in — equal => no layout shift on load
   page1Overlay?: number;  // curves drawn on the source overlay after the sample loads
   page1Data?: number;     // curves re-plotted in the data panel
   clearedOnNav?: boolean; // overlay emptied SYNCHRONOUSLY when the page changed (last session's regression)
@@ -562,7 +568,9 @@ async function runVerify(): Promise<void> {
   const count = (svg: SVGSVGElement): number => svg.querySelectorAll(".curve").length;
   try {
     publishReport({ phase: "loading", requestId });
+    const skeletonHeight = document.documentElement.scrollHeight; // skeleton state, before the sample renders
     await loadSample();
+    const loadedHeight = document.documentElement.scrollHeight;   // equal to skeletonHeight => no shift on load
     const page1Overlay = count(overlay), page1Data = count(dataplot);
     // change the page but DON'T await yet: renderPage clears the overlay before its first await, so the
     // overlay must already read empty here. This pins the "points clear immediately on input change" fix.
@@ -577,7 +585,7 @@ async function runVerify(): Promise<void> {
       hit.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 0, clientY: 0 }));
       hoverTip = tip.hidden === true ? "" : tip.textContent.replace(/\s+/g, " ").trim();
     }
-    publishReport({ phase: "ready", requestId, numPages, page1Overlay, page1Data, clearedOnNav, page2Overlay, hoverTip });
+    publishReport({ phase: "ready", requestId, numPages, skeletonHeight, loadedHeight, page1Overlay, page1Data, clearedOnNav, page2Overlay, hoverTip });
   } catch (e) {
     publishReport({ phase: "error", requestId, message: e instanceof Error ? e.message : String(e) });
   }
