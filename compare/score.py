@@ -1,9 +1,9 @@
-"""Score the manual head-to-head: GetMapped (vector + raster) vs whatever competitor CSVs you've dropped in.
+"""Score the manual head-to-head: unplot (vector + raster) vs whatever competitor CSVs you've dropped in.
 
-Runs GetMapped on each plot automatically; loads competitor exports from compare/submissions/<tool>/ if
+Runs unplot on each plot automatically; loads competitor exports from compare/submissions/<tool>/ if
 present. Matches each extracted curve to ground truth by peak, reports mean peak error (nm) + mean y-RMS.
 
-    python compare/score.py        # works with zero submissions (shows the GetMapped baseline)
+    python compare/score.py        # works with zero submissions (shows the unplot baseline)
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import os
 import numpy as np
 from PIL import Image
 
-from getmapped import Lobe, extract
+from unplot import Lobe, extract
 
 HERE = os.path.dirname(__file__)
 PLOTS = os.path.join(HERE, "plots")
@@ -75,7 +75,7 @@ def load_submission(tool, plot):
     return curves
 
 
-def getmapped(plot, n):
+def unplot(plot, n):
     pdf = os.path.join(PLOTS, f"{plot}.pdf")
     img = np.asarray(Image.open(os.path.join(PLOTS, f"{plot}.png")).convert("RGB"))
     cv = extract(pdf, frame=FRAME, prior=Lobe(0.08), expected_curves=n, order_by="peak-x")
@@ -90,8 +90,8 @@ def main():
     print("Head-to-head vs ground truth — mean peak error (nm) and mean y-RMS per curve\n")
     for plot, info in GT["plots"].items():
         n = info["n_curves"]
-        gv, gr = getmapped(plot, n)
-        rows = {"GetMapped · vector": gv, "GetMapped · raster": gr}
+        gv, gr = unplot(plot, n)
+        rows = {"unplot · vector": gv, "unplot · raster": gr}
         for t in TOOLS:
             sub = load_submission(t, plot)
             if sub:

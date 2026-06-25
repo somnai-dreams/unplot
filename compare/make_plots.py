@@ -1,5 +1,5 @@
 """Generate the manual-comparison test set: fixed synthetic plots as PNG (for the GUI tools) AND vector PDF
-(for GetMapped's vector path), plus ground_truth.json. Deterministic — no randomness. Run once:
+(for unplot's vector path), plus ground_truth.json. Deterministic — no randomness. Run once:
 
     python compare/make_plots.py
 

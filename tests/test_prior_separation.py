@@ -11,7 +11,7 @@ import pytest
 
 pytest.importorskip("cv2")   # raster extra
 
-from getmapped import Free, Monotone, extract
+from unplot import Free, Monotone, extract
 from make_synthetic import build_raster_crossing
 
 

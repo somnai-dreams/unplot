@@ -278,5 +278,5 @@ def build_adjacent_band_lobes(path: str) -> dict:
 
 if __name__ == "__main__":
     import sys
-    meta = build(sys.argv[1] if len(sys.argv) > 1 else "/tmp/getmapped_synth.pdf")
+    meta = build(sys.argv[1] if len(sys.argv) > 1 else "/tmp/unplot_synth.pdf")
     print(meta)

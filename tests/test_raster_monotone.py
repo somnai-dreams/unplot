@@ -11,7 +11,7 @@ import pytest
 
 cv2 = pytest.importorskip("cv2")   # raster extra
 
-from getmapped import Monotone, extract
+from unplot import Monotone, extract
 from make_synthetic import build_raster_monotone
 
 

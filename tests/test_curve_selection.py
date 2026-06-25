@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from getmapped import Lobe, extract
+from unplot import Lobe, extract
 from make_synthetic import build_adjacent_band_lobes, build_lobes_with_decoy, build_skirted_crossing
 
 

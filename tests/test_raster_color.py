@@ -9,7 +9,7 @@ pytest.importorskip("cv2")
 
 import fitz
 
-from getmapped import Lobe, extract
+from unplot import Lobe, extract
 from make_synthetic import FRAME, _v_to_py, _x_to_px, build
 
 

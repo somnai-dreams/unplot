@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from getmapped import Lobe, extract
-from getmapped.io import vector as iov
+from unplot import Lobe, extract
+from unplot.io import vector as iov
 from make_synthetic import build_gridded
 
 

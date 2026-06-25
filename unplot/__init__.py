@@ -1,4 +1,4 @@
-"""GetMapped — vector-PDF-native plot extraction with automatic multi-curve crossing separation.
+"""unplot — vector-PDF-native plot extraction with automatic multi-curve crossing separation.
 
 extract(plot) -> CurveSet : per-curve calibrated arrays + metadata + a first-class QA/confidence report.
 The library knows nothing about the domain; the caller injects a ShapePrior and an order->label map.

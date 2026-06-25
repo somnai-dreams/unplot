@@ -1,4 +1,4 @@
-"""Accuracy benchmark: GetMapped extraction error across difficulty tiers on synthetic ground truth.
+"""Accuracy benchmark: unplot extraction error across difficulty tiers on synthetic ground truth.
 
 No competitor here — these are absolute numbers. Each tier generates K randomized plots with known peaks
 (via PyMuPDF), extracts them, and reports the recovery rate (got the expected curve count) and the median
@@ -12,7 +12,7 @@ import tempfile
 import fitz
 import numpy as np
 
-from getmapped import Lobe, extract
+from unplot import Lobe, extract
 
 FRAME = (60.0, 40.0, 360.0, 240.0)
 XR, YR = (400.0, 700.0), (0.0, 2.0)
@@ -103,7 +103,7 @@ def run_tier(cfg, rng, tmp):
 def main():
     rng = np.random.default_rng(7)
     tmp = tempfile.mkdtemp()
-    print(f"GetMapped accuracy benchmark (K={K} plots/tier, synthetic ground truth, seed 7)")
+    print(f"unplot accuracy benchmark (K={K} plots/tier, synthetic ground truth, seed 7)")
     print("peak error per curve, nm  (vector = exact geometry; raster = pixel floor)\n")
     print(f"{'tier':32}{'median':>10}{'p90':>10}")
     print("-" * 52)

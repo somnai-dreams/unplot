@@ -6,8 +6,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from getmapped import Free, extract
-from getmapped.axes.calibrate import robust_fit, unfold_symmetric
+from unplot import Free, extract
+from unplot.axes.calibrate import robust_fit, unfold_symmetric
 from make_synthetic import build_folded_axis
 
 

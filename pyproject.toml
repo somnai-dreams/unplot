@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "getmapped"
+name = "unplot"
 version = "0.0.1"
 description = "Vector-PDF-native plot extraction with automatic multi-curve crossing separation and a first-class QA report."
 readme = "README.md"
@@ -24,7 +24,7 @@ raster = [
 test = ["pytest>=7.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["getmapped"]
+packages = ["unplot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

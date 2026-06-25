@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from getmapped import Lobe, extract
+from unplot import Lobe, extract
 from make_synthetic import FRAME, build
 
 
