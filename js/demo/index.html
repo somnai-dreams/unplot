@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GetMapped — read curves off a vector PDF</title>
+<title>unplot — read curves off a vector PDF</title>
 <script>window.__errs=[];addEventListener("error",e=>window.__errs.push(String(e.message||(e.error&&e.error.stack)||e)));addEventListener("unhandledrejection",e=>window.__errs.push("promise: "+String((e.reason&&e.reason.stack)||e.reason)));</script>
 <style>
   :root {
@@ -39,6 +39,7 @@
   .head .lede { margin: 10px 0 0; max-width: 60ch; color: var(--fg); font-size: 15px; text-wrap: pretty; }
   .head .note { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
   .head .note b { color: var(--fg); font-weight: 600; }
+  .head .tagline { margin: 4px 0 0; color: var(--faint); font-size: 13px; font-style: italic; }
 
   /* layout */
   .grid { display: grid; grid-template-columns: 268px 1fr; gap: 20px; align-items: start; }
@@ -157,9 +158,10 @@
 <div class="app">
   <header class="head">
     <div class="brand">
-      <h1>GetMapped</h1>
+      <h1>unplot</h1>
       <span class="badge">vector PDF</span>
     </div>
+    <p class="tagline">Here for the plot.</p>
     <p class="lede">Read curves straight off a vector PDF — calibrated, with overlapping ones pulled apart and a confidence score on each. Runs entirely in your browser; nothing is uploaded.</p>
     <p class="note">Works on <b>vector</b> PDFs (real drawn paths). Scanned or raster images aren't supported.</p>
   </header>

@@ -1,7 +1,7 @@
 """Generate the demo's sample PDF — synthetic colour-keyed lobe plots so the demo's page navigation,
 'extract all pages', and region-select features have something to show. Three single-plot pages plus a
 fourth page with TWO plots side by side (a mini multi-plot datasheet page) to demonstrate drag-to-select.
-Synthetic only, no copyrighted content. Run with the GetMapped venv (PyMuPDF):
+Synthetic only, no copyrighted content. Run with the unplot venv (PyMuPDF):
 `python js/demo/make_sample.py`."""
 import math
 

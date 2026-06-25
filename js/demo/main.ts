@@ -1,5 +1,5 @@
 /**
- * GetMapped browser demo — wires the TypeScript port into a static page. pdf.js renders the PDF page to a
+ * unplot browser demo — wires the TypeScript port into a static page. pdf.js renders the PDF page to a
  * canvas; extract() runs the same bytes through the port; recovered curves are drawn over the render in an
  * SVG overlay, with per-curve QA in a table and a CSV export. No server, no upload.
  */
@@ -408,7 +408,7 @@ csvBtn.addEventListener("click", () => {
   const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = allSets ? "getmapped-all-pages.csv" : "getmapped-curves.csv";
+  a.download = allSets ? "unplot-all-pages.csv" : "unplot-curves.csv";
   a.click();
   URL.revokeObjectURL(a.href);
 });
