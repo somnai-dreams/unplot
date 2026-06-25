@@ -23,6 +23,7 @@ const pagebar = $("pagebar"), pageLabel = $("pagelabel");
 const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
 const pagesWrap = $("pagesWrap"), pagesBody = $<HTMLElement>("pages").querySelector("tbody")!;
 const selbox = $("selbox"), regionbar = $("regionbar"), regionmsg = $("regionmsg"), wholepageBtn = $<HTMLButtonElement>("wholepage");
+const dataPanel = $("dataPanel"), dataplot = $<SVGSVGElement>("dataplot");
 
 type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 const PALETTE = ["#6ea8fe", "#57c98a", "#e0b341", "#e06c6c", "#b78bf0", "#4ec9d6"];
@@ -104,6 +105,16 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
     pl.setAttribute("stroke-linecap", "round");
     pl.setAttribute("stroke-linejoin", "round");
     overlay.appendChild(pl);
+    // dot a sample of the recovered points, so you can see it read points OFF the curve (not just trace it)
+    const step = Math.max(1, Math.floor(c.pointsSrc.length / 9));
+    for (let k = 0; k < c.pointsSrc.length; k += step) {
+      const m = document.createElementNS(NS, "circle");
+      m.setAttribute("cx", String(c.pointsSrc[k][0] * renderScale));
+      m.setAttribute("cy", String(c.pointsSrc[k][1] * renderScale));
+      m.setAttribute("r", "2.6"); m.setAttribute("fill", curveColor(c, i));
+      m.setAttribute("stroke", "#fff"); m.setAttribute("stroke-width", "1");
+      overlay.appendChild(m);
+    }
   });
   stage.classList.add("has-result");   // dim the source render so the bright overlay reads as the result
 
@@ -117,6 +128,47 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
   void overlay.getBoundingClientRect();           // commit the hidden start state before transitioning
   overlay.style.transition = "clip-path 760ms cubic-bezier(0.5, 0, 0.2, 1)";
   overlay.style.clipPath = "inset(0 0 0 0)";
+}
+
+/** Re-draw the extracted curves as a clean chart purely from the recovered (x,y) numbers — so it's obvious
+ *  the tool produced DATA, not a copy of the PDF image. Ticks reuse the calibration's own anchor values. */
+function renderDataPlot(cs: CurveSet): void {
+  const pts = cs.curves.flatMap((c) => c.points);
+  if (!pts.length) { dataPanel.hidden = true; return; }
+  const W = 660, H = 280, mL = 46, mR = 16, mT = 14, mB = 30;
+  let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+  for (const [x, y] of pts) { xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); ymin = Math.min(ymin, y); ymax = Math.max(ymax, y); }
+  const ySpan = ymax - ymin || 1; ymin -= ySpan * 0.04; ymax += ySpan * 0.06;
+  const xSpan = xmax - xmin || 1;
+  const mapX = (x: number) => mL + (x - xmin) / xSpan * (W - mL - mR);
+  const mapY = (y: number) => H - mB - (y - ymin) / (ymax - ymin) * (H - mB - mT);
+  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(Math.abs(v) < 10 ? 1 : 0));
+  const within = (v: number, lo: number, hi: number) => v >= lo - 1e-9 && v <= hi + 1e-9;
+  const p: string[] = [];
+  p.push(`<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${H - mB}" stroke="#d3d5dc"/>`);
+  p.push(`<line x1="${mL}" y1="${H - mB}" x2="${W - mR}" y2="${H - mB}" stroke="#d3d5dc"/>`);
+  for (const a of cs.xAxis.anchors) if (within(a[1], xmin, xmax)) {
+    const x = mapX(a[1]);
+    p.push(`<line x1="${x}" y1="${H - mB}" x2="${x}" y2="${H - mB + 4}" stroke="#c2c4cc"/>`);
+    p.push(`<text x="${x}" y="${H - mB + 16}" text-anchor="middle" font-size="10" fill="#9ca3af">${fmt(a[1])}</text>`);
+  }
+  for (const a of cs.yAxis.anchors) if (within(a[1], ymin, ymax)) {
+    const y = mapY(a[1]);
+    p.push(`<line x1="${mL - 4}" y1="${y}" x2="${mL}" y2="${y}" stroke="#c2c4cc"/>`);
+    p.push(`<text x="${mL - 7}" y="${y + 3}" text-anchor="end" font-size="10" fill="#9ca3af">${fmt(a[1])}</text>`);
+  }
+  cs.curves.forEach((c, i) => {
+    const col = curveColor(c, i);
+    const line = c.points.map((q) => `${mapX(q[0]).toFixed(1)},${mapY(q[1]).toFixed(1)}`).join(" ");
+    p.push(`<polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
+    const step = Math.max(1, Math.floor(c.points.length / 12));
+    for (let k = 0; k < c.points.length; k += step) {
+      p.push(`<circle cx="${mapX(c.points[k][0]).toFixed(1)}" cy="${mapY(c.points[k][1]).toFixed(1)}" r="2.3" fill="${col}" stroke="#fff" stroke-width="1"/>`);
+    }
+  });
+  dataplot.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  dataplot.innerHTML = p.join("");
+  dataPanel.hidden = false;
 }
 
 function peakX(c: CurveSet["curves"][number]): number {
@@ -177,6 +229,7 @@ async function run(animate = false): Promise<void> {
     const cs = await extract(pdfData, { page: pageIndex, frame: frameSel ?? undefined, ...currentOpts() });
     lastSet = cs;
     drawOverlay(cs, animate);
+    renderDataPlot(cs);
     fillTable(cs, animate);
     csvBtn.disabled = false;
   } catch (e) {
@@ -184,6 +237,7 @@ async function run(animate = false): Promise<void> {
     setqaEl.hidden = false;
     setqaEl.innerHTML = `<span class="warn">extract failed: ${e instanceof Error ? e.message : String(e)}</span>`;
     tableWrap.hidden = true;
+    dataPanel.hidden = true;
     overlay.replaceChildren();
     stage.classList.remove("has-result");   // un-dim: nothing to highlight
     csvBtn.disabled = true;

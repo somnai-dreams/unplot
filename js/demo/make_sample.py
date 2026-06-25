@@ -1,52 +1,96 @@
-"""Generate the demo's sample PDF — synthetic colour-keyed lobe plots so the demo's page navigation,
-'extract all pages', and region-select features have something to show. Three single-plot pages plus a
-fourth page with TWO plots side by side (a mini multi-plot datasheet page) to demonstrate drag-to-select.
-Synthetic only, no copyrighted content. Run with the unplot venv (PyMuPDF):
-`python js/demo/make_sample.py`."""
+"""Generate unplot's demo sample PDF — synthetic plots covering the cases the engine actually handles, so
+the demo shows more than a single clean lobe:
+
+  page 1  heavily crossing colour curves        -> separation by colour
+  page 2  monotone characteristic S-curves       -> a different prior + different axes (log-E / density)
+  page 3  one continuous pen-stroke, three humps  -> de-fan / "split shared-stroke lobes"
+  page 4  two plots side by side                  -> drag-to-select region
+
+Synthetic only, no copyrighted content. Run with the unplot venv (PyMuPDF): `python js/demo/make_sample.py`."""
 import math
 
 import fitz  # PyMuPDF
 
-NM0, NM1, VMAX = 400.0, 700.0, 2.0
-BLUE, GREEN, RED = (0, 0, 1), (0, 0.6, 0), (0.9, 0, 0)
+BLUE, GREEN, RED, INK = (0, 0, 1), (0, 0.55, 0), (0.85, 0, 0), (0.12, 0.12, 0.14)
 
 
-def gauss(nm, centre, amp, sigma):
-    return [amp * math.exp(-0.5 * ((x - centre) / sigma) ** 2) for x in nm]
+def _lin(v, a, b, p0, p1):
+    return p0 + (v - a) / (b - a) * (p1 - p0)
 
 
-def draw_plot(pg, fx0, fy0, fx1, fy1, curves):
-    """One framed plot inside [fx0..fx1] x [fy0..fy1]: frame, numeric tick labels, colour polylines."""
-    def x_px(nm): return fx0 + (nm - NM0) / (NM1 - NM0) * (fx1 - fx0)
-    def y_px(v): return fy1 - v / VMAX * (fy1 - fy0)
-    box = [fitz.Point(fx0, fy0), fitz.Point(fx1, fy0), fitz.Point(fx1, fy1), fitz.Point(fx0, fy1), fitz.Point(fx0, fy0)]
-    sh = pg.new_shape(); sh.draw_polyline(box); sh.finish(color=(0.6, 0.6, 0.6), width=1.0, closePath=False); sh.commit()
-    for tick in (400, 500, 600, 700):
-        pg.insert_text(fitz.Point(x_px(tick) - 7, fy1 + 13), str(tick), fontsize=8)
-    for tick in (0, 1, 2):
-        pg.insert_text(fitz.Point(fx0 - 16, y_px(tick) + 3), str(tick), fontsize=8)
-    nm = [NM0 + i for i in range(int(NM1 - NM0) + 1)]
-    for centre, amp, sigma, rgb in curves:
-        pts = [fitz.Point(x_px(x), y_px(v)) for x, v in zip(nm, gauss(nm, centre, amp, sigma))]
-        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=rgb, width=1.3, closePath=False); sh.commit()
+def draw_plot(pg, box, xr, yr, xticks, yticks, curves):
+    """A framed plot in `box` (fx0,fy0,fx1,fy1) with data ranges xr/yr, tick labels, and polyline curves.
+    `curves` = list of (points_in_data_xy, rgb, width)."""
+    fx0, fy0, fx1, fy1 = box
+
+    def X(x): return _lin(x, xr[0], xr[1], fx0, fx1)
+    def Y(y): return _lin(y, yr[0], yr[1], fy1, fy0)   # data-y up -> page-y down
+
+    frame = [fitz.Point(fx0, fy0), fitz.Point(fx1, fy0), fitz.Point(fx1, fy1), fitz.Point(fx0, fy1), fitz.Point(fx0, fy0)]
+    sh = pg.new_shape(); sh.draw_polyline(frame); sh.finish(color=(0.6, 0.6, 0.6), width=1.0, closePath=False); sh.commit()
+    for t in xticks:
+        pg.insert_text(fitz.Point(X(t) - (6 if t >= 0 else 9), fy1 + 13), str(t), fontsize=8)
+    for t in yticks:
+        pg.insert_text(fitz.Point(fx0 - 18, Y(t) + 3), str(t), fontsize=8)
+    for pts_xy, rgb, width in curves:
+        pts = [fitz.Point(X(x), Y(y)) for x, y in pts_xy]
+        sh = pg.new_shape(); sh.draw_polyline(pts); sh.finish(color=rgb, width=width, closePath=False); sh.commit()
 
 
-# single-plot pages: (centre, amp, sigma, rgb) per curve
-SINGLE = [
-    [(450, 1.65, 26, BLUE), (550, 1.7, 26, GREEN), (650, 1.6, 26, RED)],
-    [(480, 1.5, 30, BLUE), (560, 1.75, 24, GREEN), (640, 1.55, 28, RED)],
-    [(500, 1.8, 34, BLUE), (620, 1.5, 30, RED)],
-]
+def _xs(a, b, step=0.5):
+    n = int(round((b - a) / step))
+    return [a + i * step for i in range(n + 1)]
+
+
+def gauss(centre, amp, sigma, xs):
+    return [(x, amp * math.exp(-0.5 * ((x - centre) / sigma) ** 2)) for x in xs]
+
+
+def sigmoid(x0, lo, hi, k, xs):
+    return [(x, lo + (hi - lo) / (1 + math.exp(-k * (x - x0)))) for x in xs]
+
+
+def multilobe(centres, xs):
+    return [(x, max(a * math.exp(-0.5 * ((x - c) / s) ** 2) for c, a, s in centres)) for x in xs]
 
 
 def main():
     doc = fitz.open()
-    for curves in SINGLE:                       # pages 1-3: one plot each
-        pg = doc.new_page(width=460, height=320)
-        draw_plot(pg, 60, 30, 400, 260, curves)
-    pg = doc.new_page(width=580, height=320)    # page 4: two plots side by side (drag-to-select one)
-    draw_plot(pg, 60, 30, 270, 260, [(460, 1.7, 26, BLUE), (600, 1.6, 28, RED)])
-    draw_plot(pg, 350, 30, 560, 260, [(480, 1.65, 24, GREEN), (560, 1.55, 26, BLUE), (650, 1.5, 24, RED)])
+
+    # page 1 — heavily crossing colour curves (separation by colour)
+    pg = doc.new_page(width=480, height=320)
+    xs = _xs(400, 700)
+    draw_plot(pg, (62, 30, 420, 262), (400, 700), (0, 2), [400, 500, 600, 700], [0, 1, 2], [
+        (gauss(478, 1.75, 42, xs), BLUE, 1.3),
+        (gauss(536, 1.85, 44, xs), GREEN, 1.3),
+        (gauss(596, 1.65, 42, xs), RED, 1.3),
+    ])
+
+    # page 2 — monotone characteristic S-curves (log exposure -> density)
+    pg = doc.new_page(width=480, height=320)
+    xs = _xs(0, 4, 0.02)
+    draw_plot(pg, (62, 30, 420, 262), (0, 4), (0, 3), [0, 1, 2, 3, 4], [0, 1, 2, 3], [
+        (sigmoid(1.7, 0.12, 2.85, 2.4, xs), BLUE, 1.3),
+        (sigmoid(2.0, 0.12, 2.65, 2.2, xs), GREEN, 1.3),
+        (sigmoid(2.3, 0.12, 2.45, 2.0, xs), RED, 1.3),
+    ])
+
+    # page 3 — one continuous pen-stroke tracing three humps (de-fan / split-lobes)
+    pg = doc.new_page(width=480, height=320)
+    xs = _xs(400, 700, 0.4)
+    draw_plot(pg, (62, 30, 420, 262), (400, 700), (0, 2), [400, 500, 600, 700], [0, 1, 2], [
+        (multilobe([(460, 1.7, 17), (545, 1.85, 17), (630, 1.6, 17)], xs), INK, 1.5),
+    ])
+
+    # page 4 — two plots side by side (region select)
+    pg = doc.new_page(width=600, height=320)
+    xs = _xs(400, 700)
+    draw_plot(pg, (62, 30, 280, 262), (400, 700), (0, 2), [400, 500, 600, 700], [0, 1, 2], [
+        (gauss(470, 1.7, 24, xs), BLUE, 1.3), (gauss(600, 1.6, 26, xs), RED, 1.3),
+    ])
+    draw_plot(pg, (350, 30, 568, 262), (400, 700), (0, 2), [400, 500, 600, 700], [0, 1, 2], [
+        (gauss(480, 1.7, 22, xs), GREEN, 1.3), (gauss(560, 1.6, 24, xs), BLUE, 1.3), (gauss(650, 1.5, 22, xs), RED, 1.3),
+    ])
 
     out = __file__.rsplit("/", 1)[0] + "/sample.pdf"
     doc.save(out, deflate=True)
