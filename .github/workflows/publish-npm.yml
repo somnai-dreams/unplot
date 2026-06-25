@@ -29,10 +29,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test
 
+      # No registry-url: setup-node would write an .npmrc with _authToken=${NODE_AUTH_TOKEN},
+      # and that empty token line short-circuits the OIDC exchange (404 on publish). Default
+      # registry is npmjs.org already; trusted publishing supplies the credential.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
       - name: Publish (trusted)
         run: |
           npm install -g npm@latest   # trusted publishing needs npm >= 11.5.1
