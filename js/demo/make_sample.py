@@ -54,16 +54,36 @@ def multilobe(centres, xs):
     return [(x, max(a * math.exp(-0.5 * ((x - c) / s) ** 2) for c, a, s in centres)) for x in xs]
 
 
+def smoothstep(t):
+    t = max(0.0, min(1.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def merge_fan(xs, split=505, ramp=78):
+    """Three curves that coincide as ONE line on the left, then fan into distinct peaks — so the demo can show
+    the tracer still pulls them apart where they overlap."""
+    def g(c, a, s):
+        return lambda x: a * math.exp(-0.5 * ((x - c) / s) ** 2)
+    trunk, tb, tg, tr = g(560, 1.7, 88), g(545, 1.9, 36), g(600, 1.55, 48), g(655, 1.3, 52)
+
+    def mk(target):
+        out = []
+        for x in xs:
+            w = smoothstep((x - split) / ramp)
+            out.append((x, (1 - w) * trunk(x) + w * target(x)))
+        return out
+    return mk(tb), mk(tg), mk(tr)
+
+
 def main():
     doc = fitz.open()
 
-    # page 1 — heavily crossing colour curves (separation by colour)
+    # page 1 — three curves that merge into one line on the left, then fan apart (separation through overlap)
     pg = doc.new_page(width=480, height=320)
-    xs = _xs(400, 700)
+    xs = _xs(400, 700, 0.4)
+    b, gr, r = merge_fan(xs)
     draw_plot(pg, (62, 30, 420, 262), (400, 700), (0, 2), [400, 500, 600, 700], [0, 1, 2], [
-        (gauss(478, 1.75, 42, xs), BLUE, 1.3),
-        (gauss(536, 1.85, 44, xs), GREEN, 1.3),
-        (gauss(596, 1.65, 42, xs), RED, 1.3),
+        (b, BLUE, 1.3), (gr, GREEN, 1.3), (r, RED, 1.3),
     ])
 
     # page 2 — monotone characteristic S-curves (log exposure -> density)

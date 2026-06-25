@@ -39,6 +39,7 @@ let allSets: (CurveSet | null)[] | null = null;   // populated by "Extract all p
 let frameSel: [number, number, number, number] | null = null;   // selected ROI in source pt; null = auto-frame
 let multiPlot = false;                                           // current page holds several plots (auto-picked one)
 let selecting = false, dragged = false, selStart: [number, number] | null = null;
+let lastHi = "";                                                 // currently highlighted curve (data-c), "" = none
 
 /** Re-trigger a CSS keyframe animation by removing the class, forcing reflow, and re-adding it. */
 function replayAnim(el: HTMLElement, cls: string): void {
@@ -91,21 +92,26 @@ const fmtTick = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(Math
  *  (source coords are y-down pt; canvas px = source * renderScale.) */
 function drawOverlay(cs: CurveSet, animate: boolean): void {
   overlay.replaceChildren();
+  lastHi = "";
   cs.curves.forEach((c, i) => {
     const col = curveColor(c, i);
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("class", "curve"); g.setAttribute("data-c", String(i));
     const step = Math.max(1, Math.floor(c.pointsSrc.length / 11));
     for (let k = 0; k < c.pointsSrc.length; k += step) {
       const cx = String(c.pointsSrc[k][0] * renderScale), cy = String(c.pointsSrc[k][1] * renderScale);
       const dot = document.createElementNS(NS, "circle");
       dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", "3");
       dot.setAttribute("fill", col); dot.setAttribute("stroke", "#fff"); dot.setAttribute("stroke-width", "1.2");
-      overlay.appendChild(dot);
+      g.appendChild(dot);
       const hit = document.createElementNS(NS, "circle");   // generous, invisible hit area for hover
       hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "9");
       hit.setAttribute("fill", "transparent"); hit.setAttribute("class", "hit");
+      hit.setAttribute("data-c", String(i));
       hit.setAttribute("data-x", fmtVal(c.points[k][0])); hit.setAttribute("data-y", fmtVal(c.points[k][1]));
-      overlay.appendChild(hit);
+      g.appendChild(hit);
     }
+    overlay.appendChild(g);
   });
   stage.classList.toggle("desat", cs.curves.length > 0);   // grey the source so the colour dots are the output
   if (animate && !reduceMotion) replayAnim(overlay as unknown as HTMLElement, "fade-in");
@@ -138,16 +144,20 @@ function renderDataPlot(cs: CurveSet, animate: boolean): void {
   cs.curves.forEach((c, i) => {
     const col = curveColor(c, i);
     const line = c.points.map((q) => `${mapX(q[0]).toFixed(1)},${mapY(q[1]).toFixed(1)}`).join(" ");
-    p.push(`<polyline points="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>`);
+    p.push(`<g class="curve" data-c="${i}">`);
+    p.push(`<polyline points="${line}" fill="none" stroke="transparent" stroke-width="12" data-c="${i}"/>`);   // wide hover target
+    p.push(`<polyline class="line" points="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" data-c="${i}"/>`);
     const step = Math.max(1, Math.floor(c.points.length / 11));
     for (let k = 0; k < c.points.length; k += step) {
       const cx = mapX(c.points[k][0]).toFixed(1), cy = mapY(c.points[k][1]).toFixed(1);
       p.push(`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${col}" stroke="#fff" stroke-width="1"/>`);
-      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-x="${fmtVal(c.points[k][0])}" data-y="${fmtVal(c.points[k][1])}"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-c="${i}" data-x="${fmtVal(c.points[k][0])}" data-y="${fmtVal(c.points[k][1])}"/>`);
     }
+    p.push(`</g>`);
   });
   dataplot.setAttribute("viewBox", `0 0 ${W} ${H}`);
   dataplot.innerHTML = p.join("");
+  lastHi = "";
   if (animate && !reduceMotion) {   // the re-plot is on white, so a left-to-right reveal actually shows
     dataplot.style.transition = "none"; dataplot.style.clipPath = "inset(0 100% 0 0)";
     void dataplot.getBoundingClientRect();
@@ -155,17 +165,36 @@ function renderDataPlot(cs: CurveSet, animate: boolean): void {
   } else dataplot.style.clipPath = "";
 }
 
-/** Show a point's value on hover (delegated; only `.hit` circles carry data-x/data-y). */
+/** Raise one curve above the others in BOTH panels and fade the rest — so distinct traces are visible even
+ *  where the curves merge into one line. */
+function setHighlight(c: string | null): void {
+  const key = c ?? "";
+  if (key === lastHi) return;
+  lastHi = key;
+  for (const svg of [overlay, dataplot]) {
+    for (const g of svg.querySelectorAll<SVGGElement>(".curve")) {
+      const isit = c != null && g.getAttribute("data-c") === c;
+      g.classList.toggle("dim", c != null && !isit);
+      g.classList.toggle("active", isit);
+      if (isit) svg.appendChild(g);   // move to end -> drawn on top
+    }
+  }
+}
+
+/** Hover: a point shows its value (`.hit` circles carry data-x/data-y); any element with data-c raises its
+ *  curve in both panels. */
 function wireHover(svg: SVGElement): void {
   svg.addEventListener("mousemove", (e) => {
-    const x = (e.target as Element).getAttribute?.("data-x");
+    const el = e.target as Element;
+    const x = el.getAttribute?.("data-x");
     if (x != null) {
-      tip.innerHTML = `<span class="k">x</span> ${x}&nbsp;&nbsp;<span class="k">y</span> ${(e.target as Element).getAttribute("data-y")}`;
+      tip.innerHTML = `<span class="k">x</span> ${x}&nbsp;&nbsp;<span class="k">y</span> ${el.getAttribute("data-y")}`;
       tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 14}px`;
       tip.hidden = false;
     } else tip.hidden = true;
+    setHighlight(el.getAttribute?.("data-c") ?? null);
   });
-  svg.addEventListener("mouseleave", () => { tip.hidden = true; });
+  svg.addEventListener("mouseleave", () => { tip.hidden = true; setHighlight(null); });
 }
 
 function peakX(c: CurveSet["curves"][number]): number {

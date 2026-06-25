@@ -107,6 +107,11 @@
 
   /* extracted data */
   #dataplot { width: 100%; height: auto; display: block; }
+  /* hover a point/line: raise that curve above the others and fade the rest, so distinct traces are visible
+     even where the curves merge into one line */
+  #dataplot .curve, #overlay .curve { transition: opacity 130ms var(--ease-out); }
+  #dataplot .curve.dim, #overlay .curve.dim { opacity: 0.15; }
+  #dataplot .curve.active .line { stroke-width: 3.2; }
   .data .empty-note { color: var(--faint); font-size: 13px; padding: 56px 0; text-align: center; }
 
   /* results */
