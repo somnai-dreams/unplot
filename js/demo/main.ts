@@ -539,5 +539,47 @@ csvBtn.addEventListener("click", () => {
 
 wireHover(overlay); wireHover(dataplot);
 
+// --- page-owned verification (verification.md / automating-browsers.md). Under ?scenario=verify the page
+// drives the fragile flow itself and publishes ONE compact report to location.hash; the runner stays dumb. ---
+type VerifyReport = {
+  phase: "loading" | "ready" | "error";
+  requestId: string;
+  numPages?: number;
+  page1Overlay?: number;  // curves drawn on the source overlay after the sample loads
+  page1Data?: number;     // curves re-plotted in the data panel
+  clearedOnNav?: boolean; // overlay emptied SYNCHRONOUSLY when the page changed (last session's regression)
+  page2Overlay?: number;  // overlay repopulated for the new page
+  hoverTip?: string;      // tooltip text after hovering a point — proves the value resolves from state
+  message?: string;
+};
+const publishReport = (r: VerifyReport): void => { location.hash = `report=${encodeURIComponent(JSON.stringify(r))}`; };
+
+async function runVerify(): Promise<void> {
+  const requestId = new URLSearchParams(location.search).get("requestId") ?? "";
+  const count = (svg: SVGSVGElement): number => svg.querySelectorAll(".curve").length;
+  try {
+    publishReport({ phase: "loading", requestId });
+    await loadSample();
+    const page1Overlay = count(overlay), page1Data = count(dataplot);
+    // change the page but DON'T await yet: renderPage clears the overlay before its first await, so the
+    // overlay must already read empty here. This pins the "points clear immediately on input change" fix.
+    const nav = goToPage(1);
+    const clearedOnNav = count(overlay) === 0;
+    await nav;
+    const page2Overlay = count(overlay);
+    // hover the first recovered point; the tooltip value comes from lastSet, not a DOM attribute
+    const hit = overlay.querySelector(".hit");
+    let hoverTip = "";
+    if (hit) {
+      hit.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 0, clientY: 0 }));
+      hoverTip = tip.hidden === true ? "" : tip.textContent.replace(/\s+/g, " ").trim();
+    }
+    publishReport({ phase: "ready", requestId, numPages, page1Overlay, page1Data, clearedOnNav, page2Overlay, hoverTip });
+  } catch (e) {
+    publishReport({ phase: "error", requestId, message: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+if (new URLSearchParams(location.search).get("scenario") === "verify") void runVerify();
 // open with a result already on screen so the demo reads as a working app, not an empty shell
-void loadSample().catch(() => { /* offline / no sample: the drop zone is still there */ });
+else void loadSample().catch(() => { /* offline / no sample: the drop zone is still there */ });

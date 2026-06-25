@@ -8,11 +8,12 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p demo/tsconfig.json",
-    "lint": "oxlint --type-aware src test demo/main.ts build-demo.ts",
+    "lint": "oxlint --type-aware src test demo/main.ts demo/verify.ts build-demo.ts",
     "knip": "knip-bun",
     "check": "bun run typecheck && bun run lint && bun run knip",
     "build:demo": "bun build-demo.ts",
-    "serve:demo": "python3 demo/serve.py"
+    "serve:demo": "python3 demo/serve.py",
+    "verify:demo": "bun run build:demo && bun demo/verify.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^4.10.38"

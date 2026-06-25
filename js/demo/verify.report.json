@@ -1,0 +1,17 @@
+{
+  "phase": "ready",
+  "numPages": 4,
+  "page1Overlay": 3,
+  "page1Data": 3,
+  "clearedOnNav": true,
+  "page2Overlay": 3,
+  "hoverTip": "x 0.04 y 0.20",
+  "checks": {
+    "page reached phase:ready": true,
+    "sample produced curves on the source overlay": true,
+    "sample produced curves in the data panel": true,
+    "overlay cleared synchronously on page change": true,
+    "overlay repopulated for the new page": true,
+    "hover resolved a point value from state": true
+  }
+}
