@@ -36,6 +36,12 @@
   .head .lede { margin: 9px 0 0; max-width: 70ch; font-size: 15px; text-wrap: pretty; }
   .head .note { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
   .head .note b { color: var(--fg); font-weight: 600; }
+  .head .note a, .foot a { color: var(--accent); font-weight: 550; text-decoration: none; }
+  .head .note a:hover, .foot a:hover { color: var(--accent-press); text-decoration: underline; }
+
+  .foot { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; gap: 9px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+  .foot .dot { color: var(--faint); }
+  .foot b { color: var(--fg); font-weight: 600; }
 
   /* layout */
   .grid { display: grid; grid-template-columns: 236px 1fr; gap: 20px; align-items: start; }
@@ -154,7 +160,7 @@
   <header class="head">
     <div class="brand"><h1>unplot</h1><span class="badge">vector PDF</span></div>
     <p class="lede">Read curves straight off a vector PDF — the actual <b>numbers</b> behind the lines, calibrated, with overlapping ones pulled apart. Runs entirely in your browser; nothing is uploaded.</p>
-    <p class="note">Works on <b>vector</b> PDFs (real drawn paths). Scanned or raster images aren't supported.</p>
+    <p class="note">Works on <b>vector</b> PDFs (real drawn paths) — this in-browser build doesn't read scans. The <a href="https://github.com/somnai-dreams/unplot">Python package</a> is more capable and handles <b>raster / scanned</b> plots too.</p>
   </header>
 
   <div class="grid">
@@ -254,6 +260,14 @@
       </section>
     </div>
   </div>
+
+  <footer class="foot">
+    <span>Built by <a href="https://github.com/somnai-dreams">Maxwell Ingham</a></span>
+    <span class="dot">·</span>
+    <a href="https://github.com/somnai-dreams/unplot">GitHub ↗</a>
+    <span class="dot">·</span>
+    <span>Need <b>raster / scanned</b> plots? The <a href="https://github.com/somnai-dreams/unplot">Python package</a> does those, with more control.</span>
+  </footer>
 </div>
 <div id="tip" hidden></div>
 <script type="module" src="./app.js"></script>
