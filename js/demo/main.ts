@@ -6,6 +6,7 @@
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extract, free, lobe, monotone, type OrderBy, type ShapePrior, smooth } from "../src/index.ts";
 import type { CurveSet } from "../src/index.ts";
+import { loadVectorPage, pathBbox } from "../src/io/vector.ts";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("./pdf.worker.js", import.meta.url).toString();
 
@@ -295,6 +296,36 @@ function localXY(e: PointerEvent): [number, number] {
   ];
 }
 
+/** Position the selection box from a frame in source pt. */
+function placeSelbox(frameSrc: [number, number, number, number]): void {
+  const [fx0, fy0, fx1, fy1] = frameSrc;
+  selbox.hidden = false;
+  selbox.style.left = `${fx0 * renderScale}px`;
+  selbox.style.top = `${fy0 * renderScale}px`;
+  selbox.style.width = `${(fx1 - fx0) * renderScale}px`;
+  selbox.style.height = `${(fy1 - fy0) * renderScale}px`;
+}
+
+/** If the loose selection contains a drawn axis box (a ruled rectangle — frame or grid), snap the frame to it
+ *  so the numeric tick labels land just OUTSIDE the frame, where calibration looks for them. A user can't be
+ *  expected to trace the axes by hand; this makes a rough drag work. Falls back to the raw selection. */
+async function snapToAxisBox(sel: [number, number, number, number]): Promise<[number, number, number, number]> {
+  if (!pdfData) return sel;
+  let page;
+  try { page = await loadVectorPage(pdfData, pageIndex); } catch { return sel; }
+  const [sx0, sy0, sx1, sy1] = sel;
+  let best: [number, number, number, number] | null = null, bestArea = 0;
+  for (const p of page.paths) {
+    if (!p.ruled || p.pts.length < 4) continue;                                   // only ruled rectangles/axes
+    const [bx0, by0, bx1, by1] = pathBbox(p.pts);
+    const w = bx1 - bx0, h = by1 - by0;
+    if (w < 30 || h < 30) continue;                                               // a thin line, not a box
+    if (bx0 < sx0 - 3 || by0 < sy0 - 3 || bx1 > sx1 + 3 || by1 > sy1 + 3) continue; // must sit inside the drag
+    if (w * h > bestArea) { bestArea = w * h; best = [bx0, by0, bx1, by1]; }
+  }
+  return best ?? sel;
+}
+
 function updateRegionBar(): void {
   regionbar.hidden = stage.hidden;
   if (frameSel) {
@@ -322,7 +353,7 @@ stage.addEventListener("pointermove", (e) => {
   selbox.style.width = `${Math.abs(x - selStart[0])}px`;
   selbox.style.height = `${Math.abs(y - selStart[1])}px`;
 });
-stage.addEventListener("pointerup", (e) => {
+stage.addEventListener("pointerup", async (e) => {
   if (!selecting) return;
   selecting = false;
   if (!dragged || !selStart) { selStart = null; return; }   // a click, not a drag — leave the current region as-is
@@ -331,7 +362,9 @@ stage.addEventListener("pointerup", (e) => {
   const x1 = Math.max(selStart[0], x), y1 = Math.max(selStart[1], y);
   selStart = null;
   if (x1 - x0 < 8 || y1 - y0 < 8) { selbox.hidden = true; return; }   // too small to be a real region
-  frameSel = [x0 / renderScale, y0 / renderScale, x1 / renderScale, y1 / renderScale];   // canvas px -> source pt
+  const sel: [number, number, number, number] = [x0 / renderScale, y0 / renderScale, x1 / renderScale, y1 / renderScale];
+  frameSel = await snapToAxisBox(sel);   // snap to the plot's axis box so tick labels stay just outside the frame
+  placeSelbox(frameSel);                 // show the box where it actually snapped
   clearAllPages();        // a region changes results; any all-pages summary is stale
   updateRegionBar();
   void run(true);
