@@ -436,7 +436,11 @@ function detectPlotBoxes(page: VectorPage): [number, number, number, number][] {
     if (boxes.some((b) => Math.abs(b[0] - bb[0]) < 14 && Math.abs(b[1] - bb[1]) < 14 && Math.abs(b[2] - bb[2]) < 14)) continue; // frame + grid share a bbox
     boxes.push(bb);
   }
-  return boxes.sort((a, b) => a[0] - b[0]);
+  // drop a box nested inside a larger one — e.g. a plot's legend rectangle sitting inside its axes box
+  const area = (b: [number, number, number, number]): number => (b[2] - b[0]) * (b[3] - b[1]);
+  const real = boxes.filter((a) => !boxes.some((b) =>
+    b !== a && area(b) > area(a) && b[0] <= a[0] + 4 && b[1] <= a[1] + 4 && a[2] <= b[2] + 4 && a[3] <= b[3] + 4));
+  return real.sort((a, b) => a[0] - b[0]);
 }
 
 /** The default frame for a page: the first plot box if the page holds several plots, else undefined (whole
