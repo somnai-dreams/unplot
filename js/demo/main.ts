@@ -23,9 +23,10 @@ const pagebar = $("pagebar"), pageLabel = $("pagelabel");
 const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
 const pagesWrap = $("pagesWrap"), pagesBody = $<HTMLElement>("pages").querySelector("tbody")!;
 const selbox = $("selbox"), regionbar = $("regionbar"), regionmsg = $("regionmsg"), wholepageBtn = $<HTMLButtonElement>("wholepage");
-const dataPanel = $("dataPanel"), dataplot = $<SVGSVGElement>("dataplot");
+const dataplot = $<SVGSVGElement>("dataplot"), dataEmpty = $("dataEmpty"), tip = $("tip");
 
 type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
+const NS = "http://www.w3.org/2000/svg";
 const PALETTE = ["#6ea8fe", "#57c98a", "#e0b341", "#e06c6c", "#b78bf0", "#4ec9d6"];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let pdfData: Uint8Array | null = null;
@@ -60,15 +61,12 @@ async function renderPage(i: number): Promise<void> {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(i + 1);   // pdf.js pages are 1-based
   const unscaled = page.getViewport({ scale: 1 });
-  const avail = Math.max(320, (stage.parentElement?.clientWidth ?? 800) - 32); // fit the viewer (minus padding)
-  renderScale = Math.min(2, Math.max(0.5, avail / unscaled.width));
+  const avail = Math.max(240, stage.parentElement?.clientWidth ?? 760); // fit the stage container
+  renderScale = Math.min(2, avail / unscaled.width);   // never exceed avail, so the canvas isn't CSS-scaled
   const viewport = page.getViewport({ scale: renderScale });
   pdfCanvas.width = Math.ceil(viewport.width);
   pdfCanvas.height = Math.ceil(viewport.height);
   overlay.setAttribute("viewBox", `0 0 ${pdfCanvas.width} ${pdfCanvas.height}`);
-  overlay.setAttribute("width", String(pdfCanvas.width));
-  overlay.setAttribute("height", String(pdfCanvas.height));
-  stage.classList.remove("has-result");   // new page renders at full brightness; re-dims when curves come in
   const ctx = pdfCanvas.getContext("2d")!;
   await page.render({ canvasContext: ctx, viewport }).promise;
   stage.hidden = false;
@@ -84,91 +82,88 @@ function curveColor(c: CurveSet["curves"][number], i: number): string {
   return PALETTE[i % PALETTE.length];
 }
 
-// `animate` draws the curves in (stroke reveal, staggered) — the demo's payoff. Only on a fresh load: on
-// re-extract (a control tweak, repeated often) the overlay updates instantly so it feels responsive.
+const fmtVal = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(Math.abs(v) < 10 ? 2 : 1));
+const fmtTick = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(Math.abs(v) < 10 ? 1 : 0));
+
+/** Mark a SAMPLE of the recovered points on the source PDF — no overlay line, since it would just trace the
+ *  source and look like nothing happened. The dots show it read points OFF the curve; hover one for its value.
+ *  (source coords are y-down pt; canvas px = source * renderScale.) */
 function drawOverlay(cs: CurveSet, animate: boolean): void {
-  // source coords are y-down, top-left, in PDF pt at scale 1 — so canvas px = source * renderScale.
-  const NS = "http://www.w3.org/2000/svg";
   overlay.replaceChildren();
-  const [fx0, fy0, fx1, fy1] = cs.source.frameSrc;
-  const frame = document.createElementNS(NS, "rect");
-  frame.setAttribute("x", String(fx0 * renderScale)); frame.setAttribute("y", String(fy0 * renderScale));
-  frame.setAttribute("width", String((fx1 - fx0) * renderScale)); frame.setAttribute("height", String((fy1 - fy0) * renderScale));
-  frame.setAttribute("fill", "none"); frame.setAttribute("stroke", "#ffffff22"); frame.setAttribute("stroke-dasharray", "4 4");
-  overlay.appendChild(frame);
   cs.curves.forEach((c, i) => {
-    const pl = document.createElementNS(NS, "polyline");
-    pl.setAttribute("points", c.pointsSrc.map((p) => `${p[0] * renderScale},${p[1] * renderScale}`).join(" "));
-    pl.setAttribute("fill", "none");
-    pl.setAttribute("stroke", curveColor(c, i));
-    pl.setAttribute("stroke-width", "2.5");
-    pl.setAttribute("stroke-linecap", "round");
-    pl.setAttribute("stroke-linejoin", "round");
-    overlay.appendChild(pl);
-    // dot a sample of the recovered points, so you can see it read points OFF the curve (not just trace it)
-    const step = Math.max(1, Math.floor(c.pointsSrc.length / 9));
+    const col = curveColor(c, i);
+    const step = Math.max(1, Math.floor(c.pointsSrc.length / 11));
     for (let k = 0; k < c.pointsSrc.length; k += step) {
-      const m = document.createElementNS(NS, "circle");
-      m.setAttribute("cx", String(c.pointsSrc[k][0] * renderScale));
-      m.setAttribute("cy", String(c.pointsSrc[k][1] * renderScale));
-      m.setAttribute("r", "2.6"); m.setAttribute("fill", curveColor(c, i));
-      m.setAttribute("stroke", "#fff"); m.setAttribute("stroke-width", "1");
-      overlay.appendChild(m);
+      const cx = String(c.pointsSrc[k][0] * renderScale), cy = String(c.pointsSrc[k][1] * renderScale);
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", "3");
+      dot.setAttribute("fill", col); dot.setAttribute("stroke", "#fff"); dot.setAttribute("stroke-width", "1.2");
+      overlay.appendChild(dot);
+      const hit = document.createElementNS(NS, "circle");   // generous, invisible hit area for hover
+      hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "9");
+      hit.setAttribute("fill", "transparent"); hit.setAttribute("class", "hit");
+      hit.setAttribute("data-x", fmtVal(c.points[k][0])); hit.setAttribute("data-y", fmtVal(c.points[k][1]));
+      overlay.appendChild(hit);
     }
   });
-  stage.classList.add("has-result");   // dim the source render so the bright overlay reads as the result
-
-  // Reveal: wipe the bright overlay in left-to-right over the dimmed plot — a "scan" reading the curves off
-  // it. A per-curve stroke draw is invisible here: the overlay lands exactly on the identical source line
-  // underneath, so it only ever brightens. A clip sweep against the dimmed render is clearly visible. First
-  // load only; re-extract (a repeated control tweak) updates instantly.
-  if (!animate || reduceMotion) { overlay.style.clipPath = ""; return; }
-  overlay.style.transition = "none";
-  overlay.style.clipPath = "inset(0 100% 0 0)";   // hidden, then revealed from the left
-  void overlay.getBoundingClientRect();           // commit the hidden start state before transitioning
-  overlay.style.transition = "clip-path 760ms cubic-bezier(0.5, 0, 0.2, 1)";
-  overlay.style.clipPath = "inset(0 0 0 0)";
+  if (animate && !reduceMotion) replayAnim(overlay as unknown as HTMLElement, "fade-in");
 }
 
 /** Re-draw the extracted curves as a clean chart purely from the recovered (x,y) numbers — so it's obvious
- *  the tool produced DATA, not a copy of the PDF image. Ticks reuse the calibration's own anchor values. */
-function renderDataPlot(cs: CurveSet): void {
+ *  the tool produced DATA, not a copy of the PDF image. Matches the source plot's axis range (the calibration
+ *  anchors, extended to the data) AND its aspect ratio, so it reads as the SAME curves. Points are hoverable. */
+function renderDataPlot(cs: CurveSet, animate: boolean): void {
   const pts = cs.curves.flatMap((c) => c.points);
-  if (!pts.length) { dataPanel.hidden = true; return; }
-  const W = 660, H = 280, mL = 46, mR = 16, mT = 14, mB = 30;
+  if (!pts.length) { dataplot.replaceChildren(); dataplot.removeAttribute("viewBox"); dataEmpty.hidden = false; return; }
+  dataEmpty.hidden = true;
   let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
   for (const [x, y] of pts) { xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); ymin = Math.min(ymin, y); ymax = Math.max(ymax, y); }
-  const ySpan = ymax - ymin || 1; ymin -= ySpan * 0.04; ymax += ySpan * 0.06;
-  const xSpan = xmax - xmin || 1;
-  const mapX = (x: number) => mL + (x - xmin) / xSpan * (W - mL - mR);
-  const mapY = (y: number) => H - mB - (y - ymin) / (ymax - ymin) * (H - mB - mT);
-  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(Math.abs(v) < 10 ? 1 : 0));
-  const within = (v: number, lo: number, hi: number) => v >= lo - 1e-9 && v <= hi + 1e-9;
+  for (const a of cs.xAxis.anchors) { xmin = Math.min(xmin, a[1]); xmax = Math.max(xmax, a[1]); }
+  for (const a of cs.yAxis.anchors) { ymin = Math.min(ymin, a[1]); ymax = Math.max(ymax, a[1]); }
+  const xSpan = xmax - xmin || 1, ySpan = ymax - ymin || 1;
+  const [sx0, sy0, sx1, sy1] = cs.source.frameSrc;
+  const aspect = Math.min(3, Math.max(0.7, (sx1 - sx0) / (sy1 - sy0 || 1)));   // mirror the source proportions
+  const mL = 46, mR = 14, mT = 12, mB = 28, plotW = 480, plotH = Math.round(plotW / aspect);
+  const W = plotW + mL + mR, H = plotH + mT + mB;
+  const mapX = (x: number) => mL + (x - xmin) / xSpan * plotW;
+  const mapY = (y: number) => mT + (ymax - y) / ySpan * plotH;
+  const inR = (v: number, lo: number, hi: number) => v >= lo - 1e-9 && v <= hi + 1e-9;
   const p: string[] = [];
-  p.push(`<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${H - mB}" stroke="#d3d5dc"/>`);
-  p.push(`<line x1="${mL}" y1="${H - mB}" x2="${W - mR}" y2="${H - mB}" stroke="#d3d5dc"/>`);
-  for (const a of cs.xAxis.anchors) if (within(a[1], xmin, xmax)) {
-    const x = mapX(a[1]);
-    p.push(`<line x1="${x}" y1="${H - mB}" x2="${x}" y2="${H - mB + 4}" stroke="#c2c4cc"/>`);
-    p.push(`<text x="${x}" y="${H - mB + 16}" text-anchor="middle" font-size="10" fill="#9ca3af">${fmt(a[1])}</text>`);
-  }
-  for (const a of cs.yAxis.anchors) if (within(a[1], ymin, ymax)) {
-    const y = mapY(a[1]);
-    p.push(`<line x1="${mL - 4}" y1="${y}" x2="${mL}" y2="${y}" stroke="#c2c4cc"/>`);
-    p.push(`<text x="${mL - 7}" y="${y + 3}" text-anchor="end" font-size="10" fill="#9ca3af">${fmt(a[1])}</text>`);
-  }
+  p.push(`<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT + plotH}" stroke="#dcdde2"/>`);
+  p.push(`<line x1="${mL}" y1="${mT + plotH}" x2="${mL + plotW}" y2="${mT + plotH}" stroke="#dcdde2"/>`);
+  for (const a of cs.xAxis.anchors) if (inR(a[1], xmin, xmax)) { const x = mapX(a[1]); p.push(`<line x1="${x}" y1="${mT + plotH}" x2="${x}" y2="${mT + plotH + 4}" stroke="#c8cad1"/><text x="${x}" y="${mT + plotH + 16}" text-anchor="middle" font-size="10" fill="#9ca3af">${fmtTick(a[1])}</text>`); }
+  for (const a of cs.yAxis.anchors) if (inR(a[1], ymin, ymax)) { const y = mapY(a[1]); p.push(`<line x1="${mL - 4}" y1="${y}" x2="${mL}" y2="${y}" stroke="#c8cad1"/><text x="${mL - 7}" y="${y + 3}" text-anchor="end" font-size="10" fill="#9ca3af">${fmtTick(a[1])}</text>`); }
   cs.curves.forEach((c, i) => {
     const col = curveColor(c, i);
     const line = c.points.map((q) => `${mapX(q[0]).toFixed(1)},${mapY(q[1]).toFixed(1)}`).join(" ");
-    p.push(`<polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
-    const step = Math.max(1, Math.floor(c.points.length / 12));
+    p.push(`<polyline points="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>`);
+    const step = Math.max(1, Math.floor(c.points.length / 11));
     for (let k = 0; k < c.points.length; k += step) {
-      p.push(`<circle cx="${mapX(c.points[k][0]).toFixed(1)}" cy="${mapY(c.points[k][1]).toFixed(1)}" r="2.3" fill="${col}" stroke="#fff" stroke-width="1"/>`);
+      const cx = mapX(c.points[k][0]).toFixed(1), cy = mapY(c.points[k][1]).toFixed(1);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${col}" stroke="#fff" stroke-width="1"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-x="${fmtVal(c.points[k][0])}" data-y="${fmtVal(c.points[k][1])}"/>`);
     }
   });
   dataplot.setAttribute("viewBox", `0 0 ${W} ${H}`);
   dataplot.innerHTML = p.join("");
-  dataPanel.hidden = false;
+  if (animate && !reduceMotion) {   // the re-plot is on white, so a left-to-right reveal actually shows
+    dataplot.style.transition = "none"; dataplot.style.clipPath = "inset(0 100% 0 0)";
+    void dataplot.getBoundingClientRect();
+    dataplot.style.transition = "clip-path 700ms cubic-bezier(0.5,0,0.2,1)"; dataplot.style.clipPath = "inset(0 0 0 0)";
+  } else dataplot.style.clipPath = "";
+}
+
+/** Show a point's value on hover (delegated; only `.hit` circles carry data-x/data-y). */
+function wireHover(svg: SVGElement): void {
+  svg.addEventListener("mousemove", (e) => {
+    const x = (e.target as Element).getAttribute?.("data-x");
+    if (x != null) {
+      tip.innerHTML = `<span class="k">x</span> ${x}&nbsp;&nbsp;<span class="k">y</span> ${(e.target as Element).getAttribute("data-y")}`;
+      tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 14}px`;
+      tip.hidden = false;
+    } else tip.hidden = true;
+  });
+  svg.addEventListener("mouseleave", () => { tip.hidden = true; });
 }
 
 function peakX(c: CurveSet["curves"][number]): number {
@@ -229,7 +224,7 @@ async function run(animate = false): Promise<void> {
     const cs = await extract(pdfData, { page: pageIndex, frame: frameSel ?? undefined, ...currentOpts() });
     lastSet = cs;
     drawOverlay(cs, animate);
-    renderDataPlot(cs);
+    renderDataPlot(cs, animate);
     fillTable(cs, animate);
     csvBtn.disabled = false;
   } catch (e) {
@@ -237,9 +232,8 @@ async function run(animate = false): Promise<void> {
     setqaEl.hidden = false;
     setqaEl.innerHTML = `<span class="warn">extract failed: ${e instanceof Error ? e.message : String(e)}</span>`;
     tableWrap.hidden = true;
-    dataPanel.hidden = true;
     overlay.replaceChildren();
-    stage.classList.remove("has-result");   // un-dim: nothing to highlight
+    dataplot.replaceChildren(); dataplot.removeAttribute("viewBox"); dataEmpty.hidden = false;
     csvBtn.disabled = true;
   }
 }
@@ -501,6 +495,8 @@ csvBtn.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(a.href);
 });
+
+wireHover(overlay); wireHover(dataplot);
 
 // open with a result already on screen so the demo reads as a working app, not an empty shell
 void loadSample().catch(() => { /* offline / no sample: the drop zone is still there */ });

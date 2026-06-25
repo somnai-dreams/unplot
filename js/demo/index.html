@@ -19,33 +19,30 @@
     --r-card: 16px; --r-ctl: 10px;
   }
   * { box-sizing: border-box; }
-  [hidden] { display: none !important; }   /* beat the display set by .btn/.pagebar/.stage etc. */
+  [hidden] { display: none !important; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
   }
-  .app { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
+  .app { max-width: 1320px; margin: 0 auto; padding: 36px 28px 64px; }
 
   /* header */
-  .head { margin-bottom: 28px; }
+  .head { margin-bottom: 24px; }
   .brand { display: flex; align-items: center; gap: 10px; }
   .brand h1 { margin: 0; font-size: 22px; font-weight: 640; letter-spacing: -0.02em; }
-  .badge {
-    font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--accent);
-    background: var(--accent-soft); padding: 3px 9px; border-radius: 999px;
-  }
-  .head .lede { margin: 10px 0 0; max-width: 60ch; color: var(--fg); font-size: 15px; text-wrap: pretty; }
-  .head .note { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .badge { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 3px 9px; border-radius: 999px; }
+  .head .lede { margin: 9px 0 0; max-width: 70ch; font-size: 15px; text-wrap: pretty; }
+  .head .note { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
   .head .note b { color: var(--fg); font-weight: 600; }
-  .head .tagline { margin: 4px 0 0; color: var(--faint); font-size: 13px; font-style: italic; }
 
   /* layout */
-  .grid { display: grid; grid-template-columns: 268px 1fr; gap: 20px; align-items: start; }
-  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .grid { display: grid; grid-template-columns: 236px 1fr; gap: 20px; align-items: start; }
+  .main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
   .panel { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-sm); }
-  .controls { padding: 18px; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 18px; }
+  .controls { padding: 18px; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 16px; }
 
   /* form fields */
   .field { display: flex; flex-direction: column; gap: 7px; }
@@ -53,25 +50,19 @@
   select, input[type=number] {
     width: 100%; height: 36px; padding: 0 10px; font: inherit; color: var(--fg);
     background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
-    transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
-    appearance: none; -webkit-appearance: none;
+    transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out); appearance: none; -webkit-appearance: none;
   }
   select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5L6 7.5L9 4.5' stroke='%239ca3af' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"); background-repeat: no-repeat; background-position: right 11px center; padding-right: 28px; cursor: pointer; }
   select:hover, input:hover { border-color: #d3d5dc; }
   select:focus-visible, input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
   .hint { font-size: 12px; color: var(--faint); }
-  .check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--fg); cursor: pointer; user-select: none; }
+  .check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; cursor: pointer; user-select: none; }
   .check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
-
-  .divider { height: 1px; background: var(--line); margin: 2px 0; }
+  .divider { height: 1px; background: var(--line); }
 
   /* buttons */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    height: 38px; padding: 0 14px; font: inherit; font-weight: 550; border-radius: var(--r-ctl);
-    border: 1px solid transparent; cursor: pointer; white-space: nowrap;
-    transition: transform 120ms var(--ease-out), background-color 140ms var(--ease-out), border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out), color 140ms var(--ease-out);
-  }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 14px; font: inherit; font-weight: 550; border-radius: var(--r-ctl); border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: transform 120ms var(--ease-out), background-color 140ms var(--ease-out), border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out), color 140ms var(--ease-out); }
   .btn.primary { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
   .btn.ghost { background: var(--surface); color: var(--fg); border-color: var(--line-strong); }
   .btn:active:not(:disabled) { transform: scale(0.96); }
@@ -81,52 +72,50 @@
     .btn.primary:not(:disabled):hover { background: var(--accent-press); }
     .btn.ghost:not(:disabled):hover { background: var(--raised); border-color: #d3d5dc; }
   }
-  .link {
-    background: none; border: 0; padding: 0; font: inherit; color: var(--accent); font-weight: 550;
-    cursor: pointer; align-self: flex-start; transition: color 120ms var(--ease-out);
-  }
+  .link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); font-weight: 550; cursor: pointer; align-self: flex-start; transition: color 120ms var(--ease-out); }
   .link:hover { color: var(--accent-press); }
   .actions { display: flex; flex-direction: column; gap: 9px; }
 
   /* drop zone */
-  .drop {
-    border: 1.5px dashed var(--line-strong); border-radius: var(--r-ctl); padding: 16px; text-align: center; cursor: pointer;
-    transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out);
-  }
+  .drop { border: 1.5px dashed var(--line-strong); border-radius: var(--r-ctl); padding: 16px; text-align: center; cursor: pointer; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out); }
   .drop strong { display: block; font-weight: 600; font-size: 13.5px; }
   .drop span { font-size: 12px; color: var(--muted); }
   .drop.hot, .drop:hover { border-color: var(--accent); background: var(--accent-soft); }
 
-  /* viewer */
-  .viewer { padding: 16px; }
-  .pagebar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-  .pagenav { width: 30px; height: 30px; padding: 0; font-size: 15px; line-height: 1; }
+  /* panel header (shared by viewer + data) */
+  .panelhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+  .panelhead .ttl { font-size: 12px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+  .panelbody { padding: 14px 16px 16px; }
+
+  /* viewer (source PDF) */
+  .pagenav { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .pagebtn { width: 26px; height: 26px; padding: 0; font-size: 14px; line-height: 1; }
+  .stagewrap { display: flex; justify-content: center; }
   .stage { position: relative; display: inline-block; line-height: 0; max-width: 100%; }
-  .stage.enter { animation: stageIn 420ms var(--ease-out) both; }
   .stage.ready { cursor: crosshair; touch-action: none; }
-  .stage canvas { display: block; outline: 1px solid rgba(0,0,0,.07); outline-offset: -1px; border-radius: 12px; transition: filter 420ms var(--ease-out), opacity 420ms var(--ease-out); }
-  .stage.has-result canvas { opacity: .82; filter: saturate(.32) contrast(.97); }  /* source recedes; bright overlay reads as the result */
-  .stage svg { position: absolute; left: 0; top: 0; pointer-events: none; }
-  .selbox { position: absolute; border: 1.5px solid var(--accent); background: rgba(79,70,229,.1); border-radius: 4px; pointer-events: none; }
-  .busy { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 48px 4px; justify-content: center; }
+  .stage canvas { display: block; max-width: 100%; height: auto; outline: 1px solid rgba(0,0,0,.07); outline-offset: -1px; border-radius: 10px; }
+  .stage svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+  .stage svg .hit { pointer-events: all; }
+  .selbox { position: absolute; border: 1.5px solid var(--accent); background: rgba(79,70,229,.08); border-radius: 4px; pointer-events: none; }
+  .busy { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 60px 4px; justify-content: center; }
   .busy.on { display: flex; }
   .spinner { width: 17px; height: 17px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  .regionbar { display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .regionbar { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
   .regionbar b { color: var(--fg); font-weight: 600; }
 
-  /* results */
-  .results { padding: 18px 20px 20px; }
-  .results.empty { display: none; }
-  .data { padding: 16px 18px 18px; }
-  .datahead { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin-bottom: 8px; }
-  .datahead .hint { text-transform: none; letter-spacing: 0; margin-left: 4px; }
+  /* extracted data */
   #dataplot { width: 100%; height: auto; display: block; }
+  .data .empty-note { color: var(--faint); font-size: 13px; padding: 56px 0; text-align: center; }
+
+  /* results */
+  .results { padding: 16px 18px 18px; }
+  .results.empty { display: none; }
   .setqa { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .setqa b { color: var(--fg); font-weight: 600; }
   .warn { color: var(--warn); }
-  .subhead { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin: 18px 0 8px; }
+  .subhead { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin: 16px 0 6px; }
   .subhead .hint { text-transform: none; letter-spacing: 0; margin-left: 6px; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 12px; }
   #pages { margin-top: 0; }
   th { text-align: left; padding: 8px 10px; color: var(--faint); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
   td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
@@ -140,33 +129,24 @@
   #pages tbody tr.active { background: var(--accent-soft); }
   @media (hover: hover) and (pointer: fine) { #pages tbody tr:hover { background: var(--raised); } }
 
+  /* hover tooltip for data points */
+  #tip { position: fixed; z-index: 50; pointer-events: none; background: #18181b; color: #fff; font: 500 12px/1.3 var(--mono); padding: 5px 8px; border-radius: 7px; box-shadow: var(--shadow); white-space: nowrap; transform: translateY(2px); }
+  #tip .k { color: #a5b4fc; }
+
+  .fade-in { animation: fadeIn 340ms var(--ease-out) both; }
   tbody tr.row-in { animation: rowIn 360ms var(--ease-out) both; }
-  @keyframes stageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes rowIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .fade-in { animation: fadeIn 360ms var(--ease-out) both; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-  @media (prefers-reduced-motion: reduce) {
-    .stage.enter, tbody tr.row-in, .fade-in { animation: fadeIn 240ms ease both; }
-    #overlay polyline { transition: none !important; }
-    .btn:active:not(:disabled) { transform: none; }
-  }
-  @media (max-width: 760px) {
-    .grid { grid-template-columns: 1fr; }
-    .controls { position: static; }
-  }
+  @media (prefers-reduced-motion: reduce) { .fade-in, tbody tr.row-in { animation: fadeIn 220ms ease both; } .btn:active:not(:disabled) { transform: none; } }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .controls { position: static; } .duo { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <div class="app">
   <header class="head">
-    <div class="brand">
-      <h1>unplot</h1>
-      <span class="badge">vector PDF</span>
-    </div>
-    <p class="tagline">Here for the plot.</p>
-    <p class="lede">Read curves straight off a vector PDF — calibrated, with overlapping ones pulled apart and a confidence score on each. Runs entirely in your browser; nothing is uploaded.</p>
+    <div class="brand"><h1>unplot</h1><span class="badge">vector PDF</span></div>
+    <p class="lede">Read curves straight off a vector PDF — the actual <b>numbers</b> behind the lines, calibrated, with overlapping ones pulled apart. Runs entirely in your browser; nothing is uploaded.</p>
     <p class="note">Works on <b>vector</b> PDFs (real drawn paths). Scanned or raster images aren't supported.</p>
   </header>
 
@@ -181,9 +161,7 @@
         </div>
         <button id="sample" class="link">Reload the sample</button>
       </div>
-
       <div class="divider"></div>
-
       <div class="field">
         <label for="prior">Shape prior</label>
         <select id="prior">
@@ -193,7 +171,7 @@
           <option value="smooth">Smooth — no spikes</option>
         </select>
       </div>
-      <div class="field" id="tolWrap">
+      <div class="field" id="tolWrap" hidden>
         <label for="tol">Tolerance</label>
         <input id="tol" type="number" step="0.01" min="0" value="0.08" />
       </div>
@@ -211,56 +189,66 @@
         </select>
       </div>
       <label class="check"><input id="split" type="checkbox" /> Split shared-stroke lobes</label>
-
       <div class="divider"></div>
-
       <div class="actions">
-        <button id="csv" class="btn ghost" disabled>Download CSV</button>
+        <button id="csv" class="btn primary" disabled>Download CSV</button>
         <button id="extractall" class="btn ghost" hidden>Extract all pages</button>
       </div>
     </aside>
 
-    <div class="col">
-      <section class="panel viewer">
-        <div id="pagebar" class="pagebar" hidden>
-          <button id="prev" class="btn ghost pagenav" aria-label="Previous page">‹</button>
-          <span id="pagelabel">Page 1 / 1</span>
-          <button id="next" class="btn ghost pagenav" aria-label="Next page">›</button>
-        </div>
-        <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
-        <div id="stage" class="stage" hidden>
-          <canvas id="pdf"></canvas>
-          <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
-          <div id="selbox" class="selbox" hidden></div>
-        </div>
-        <div id="regionbar" class="regionbar" hidden>
-          <span id="regionmsg"></span>
-          <button id="wholepage" class="btn ghost pagenav" style="width:auto;height:30px;padding:0 12px;font-size:13px" hidden>Use whole page</button>
-        </div>
-      </section>
+    <div class="main">
+      <div class="duo">
+        <section class="panel viewer">
+          <div class="panelhead">
+            <span class="ttl">Source PDF</span>
+            <div id="pagebar" class="pagenav" hidden>
+              <button id="prev" class="btn ghost pagebtn" aria-label="Previous page">‹</button>
+              <span id="pagelabel">Page 1 / 1</span>
+              <button id="next" class="btn ghost pagebtn" aria-label="Next page">›</button>
+            </div>
+          </div>
+          <div class="panelbody">
+            <div id="busy" class="busy"><span class="spinner"></span> reading the PDF…</div>
+            <div class="stagewrap">
+              <div id="stage" class="stage" hidden>
+                <canvas id="pdf"></canvas>
+                <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="selbox" class="selbox" hidden></div>
+              </div>
+            </div>
+            <div id="regionbar" class="regionbar" hidden>
+              <span id="regionmsg"></span>
+              <button id="wholepage" class="btn ghost pagebtn" style="width:auto;height:26px;padding:0 10px;font-size:12.5px" hidden>Use whole page</button>
+            </div>
+          </div>
+        </section>
 
-      <section id="dataPanel" class="panel data" hidden>
-        <div class="datahead">Extracted data <span class="hint">— re-drawn from the recovered numbers, not the PDF</span></div>
-        <svg id="dataplot" xmlns="http://www.w3.org/2000/svg"></svg>
-      </section>
+        <section class="panel data">
+          <div class="panelhead">
+            <span class="ttl">Extracted data</span>
+            <span class="hint">re-drawn from the numbers · hover a point</span>
+          </div>
+          <div class="panelbody">
+            <svg id="dataplot" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="dataEmpty" class="empty-note" hidden>No curves recovered.</div>
+          </div>
+        </section>
+      </div>
 
       <section id="results" class="panel results empty">
         <div id="setqa" class="setqa" hidden></div>
         <div id="pagesWrap" hidden>
           <div class="subhead">All pages <span class="hint">— click a row to view</span></div>
-          <table id="pages"><thead><tr>
-            <th>Page</th><th>Curves</th><th>Confidence</th><th>Crossings</th><th>Notes</th>
-          </tr></thead><tbody></tbody></table>
+          <table id="pages"><thead><tr><th>Page</th><th>Curves</th><th>Confidence</th><th>Crossings</th><th>Notes</th></tr></thead><tbody></tbody></table>
         </div>
         <div id="tableWrap" hidden>
-          <table id="qa"><thead><tr>
-            <th>Curve</th><th>Points</th><th>Peak</th><th>Confidence</th><th>Violation</th><th>Monotonic</th><th>Status</th>
-          </tr></thead><tbody></tbody></table>
+          <table id="qa"><thead><tr><th>Curve</th><th>Points</th><th>Peak</th><th>Confidence</th><th>Violation</th><th>Monotonic</th><th>Status</th></tr></thead><tbody></tbody></table>
         </div>
       </section>
     </div>
   </div>
 </div>
+<div id="tip" hidden></div>
 <script type="module" src="./app.js"></script>
 </body>
 </html>
