@@ -1,10 +1,12 @@
-# GetMapped
+# unplot
+
+*Here for the plot.*
 
 **Read curves off a plot, straight from the vector PDF, with overlapping curves pulled apart and a confidence score on each.**
 
-GetMapped is a headless library (Python and TypeScript) for digitizing line and curve plots. Interactive tools like WebPlotDigitizer, Engauge, and PlotDigitizer want you to load an image and click to calibrate the axes. GetMapped runs unattended instead, and does two things those tools don't:
+unplot is a headless library (Python and TypeScript) for digitizing line and curve plots. Interactive tools like WebPlotDigitizer, Engauge, and PlotDigitizer want you to load an image and click to calibrate the axes. unplot runs unattended instead, and does two things those tools don't:
 
-- **Vector-PDF-native.** When a PDF's curves are real drawn paths, GetMapped reads the exact geometry out of the file. No rasterizing, no pixel re-detection, no clicking. The numbers you get back are the numbers that were drawn.
+- **Vector-PDF-native.** When a PDF's curves are real drawn paths, unplot reads the exact geometry out of the file. No rasterizing, no pixel re-detection, no clicking. The numbers you get back are the numbers that were drawn.
 - **Automatic crossing separation.** Where curves overlap and cross, it keeps them apart: by stroke style or colour for vector paths, by hue for colour-coded raster images, or by de-fanning and re-chaining a single pen stroke that traces several lobes at once.
 
 Every result also carries a **confidence report**, per curve and for the set: shape-prior violations, calibration fit, coverage gaps, crossings. If a curve is suspect, the report says so.
@@ -14,7 +16,7 @@ Every result also carries a **confidence report**, per curve and for the set: sh
 Python:
 
 ```python
-from getmapped import extract, Lobe
+from unplot import extract, Lobe
 
 cs = extract("plot.pdf", frame=(60, 40, 360, 240),
              prior=Lobe(0.08), expected_curves=3, order_by="peak-x")
@@ -28,7 +30,7 @@ named = cs.labeled({0: "blue", 1: "green", 2: "red"})   # you map order to meani
 TypeScript, in the browser, with no Python and no server (see [`js/`](js/)):
 
 ```ts
-import { extract, lobe } from "getmapped";   // js/src/index.ts
+import { extract, lobe } from "unplot";   // js/src/index.ts
 
 const data = new Uint8Array(await (await fetch("plot.pdf")).arrayBuffer());
 const cs = await extract(data, { expectedCurves: 3, prior: lobe(0.08), orderBy: "peak-x" });
@@ -42,7 +44,7 @@ cs.curves.forEach(c => console.log(c.id, c.style.color, c.qa.confidence));
 `extract(plot) -> CurveSet`. One plot region in, one CurveSet out:
 
 - **calibrated arrays** per curve (`points`, in your axis units), plus source-space points for overlay
-- **neutral identity.** Curves come back as `c0, c1, …`, ordered deterministically by peak-x, mean-y, or first-x. GetMapped knows nothing about your domain; you map order to meaning.
+- **neutral identity.** Curves come back as `c0, c1, …`, ordered deterministically by peak-x, mean-y, or first-x. unplot knows nothing about your domain; you map order to meaning.
 - **a QA report**: `CurveQA` per curve, `CurveSetQA` for the set.
 
 ## Shape priors
@@ -83,9 +85,9 @@ The vector path also reproduces reference extractions of real PDFs numerically: 
 
 ## How it compares
 
-GetMapped is narrower than the established tools on purpose: line and curve plots, headless, vector-native, self-reporting its own confidence, built for batch and automation rather than interactive correction. WebPlotDigitizer and Engauge are mature GUIs that cover many chart types and let a human fix mistakes live. To digitize one chart by hand, use them.
+unplot is narrower than the established tools on purpose: line and curve plots, headless, vector-native, self-reporting its own confidence, built for batch and automation rather than interactive correction. WebPlotDigitizer and Engauge are mature GUIs that cover many chart types and let a human fix mistakes live. To digitize one chart by hand, use them.
 
-| capability | GetMapped | WebPlotDigitizer | Engauge | PlotDigitizer |
+| capability | unplot | WebPlotDigitizer | Engauge | PlotDigitizer |
 |-|-|-|-|-|
 | reads vector-PDF geometry | yes | no (image) | no (image) | no (image) |
 | automatic axis calibration | yes (vector) | click axes | click axes | click axes |
@@ -95,15 +97,15 @@ GetMapped is narrower than the established tools on purpose: line and curve plot
 | other chart types (polar, bar…) | no | yes | yes | yes |
 | license | MIT | AGPL-3.0 | GPL | proprietary |
 
-On clean colour plots a head-to-head against the real WebPlotDigitizer 4.8 (its own auto-extraction, with an exact calibration set through its API) is a dead heat: both land around 0.5 to 1 unit, because both do a colour mask plus per-column averaging. GetMapped pulls ahead on vector PDFs, which WPD can't read at all; on noise, where its denoising rode out a case WPD's fixed threshold tripped on; and on frame removal, since WPD grabbed the black plot frame until a region was masked. WPD is the only incumbent benchmarked here. Engauge is a desktop GUI and PlotDigitizer is login-gated, so neither can be batch-run.
+On clean colour plots a head-to-head against the real WebPlotDigitizer 4.8 (its own auto-extraction, with an exact calibration set through its API) is a dead heat: both land around 0.5 to 1 unit, because both do a colour mask plus per-column averaging. unplot pulls ahead on vector PDFs, which WPD can't read at all; on noise, where its denoising rode out a case WPD's fixed threshold tripped on; and on frame removal, since WPD grabbed the black plot frame until a region was masked. WPD is the only incumbent benchmarked here. Engauge is a desktop GUI and PlotDigitizer is login-gated, so neither can be batch-run.
 
 ## Install
 
 Python:
 
 ```bash
-pip install getmapped            # vector-PDF core + numpy
-pip install "getmapped[raster]"  # adds opencv/pillow for the raster fallback
+pip install unplot            # vector-PDF core + numpy
+pip install "unplot[raster]"  # adds opencv/pillow for the raster fallback
 ```
 
 TypeScript: the port lives in [`js/`](js/). Run `npm install` there; the only runtime dependency is pdf.js (`pdfjs-dist`, Apache-2.0).
@@ -111,7 +113,7 @@ TypeScript: the port lives in [`js/`](js/). Run `npm install` there; the only ru
 ## Tests
 
 ```bash
-pip install "getmapped[test]" && pytest   # Python
+pip install "unplot[test]" && pytest   # Python
 cd js && npm test                          # TypeScript
 ```
 

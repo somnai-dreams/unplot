@@ -1,11 +1,11 @@
 # Manual head-to-head: digitize these plots in WebPlotDigitizer / Engauge
 
-GetMapped runs automatically in the scorer. The interactive tools (WPD, Engauge) can't be scripted, so this
+unplot runs automatically in the scorer. The interactive tools (WPD, Engauge) can't be scripted, so this
 is the one part that needs a human. Do as many plots/tools as you have patience for — even one is useful.
 
 ## The plots (`compare/plots/`)
 
-Each plot is provided as a **PNG** (load this into the GUI tools) and a **PDF** (GetMapped reads this for its
+Each plot is provided as a **PNG** (load this into the GUI tools) and a **PDF** (unplot reads this for its
 vector path). Same axes on all: **x = 400…700, y = 0…2**, with tick labels drawn for calibration.
 
 |file|curves|colours (left→right by peak)|
@@ -45,7 +45,7 @@ CSV format is forgiving — comma or whitespace separated, header lines are skip
 python compare/score.py
 ```
 
-It runs GetMapped (vector + raster) on every plot and folds in whatever competitor CSVs you've added,
+It runs unplot (vector + raster) on every plot and folds in whatever competitor CSVs you've added,
 reporting mean peak error and mean y-RMS per curve against ground truth (in x/y axis units). Re-run
 anytime you add more.
 
