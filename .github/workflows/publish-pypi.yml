@@ -1,0 +1,37 @@
+name: Publish to PyPI
+
+# Trusted publishing (OIDC): no API token. PyPI is configured to trust this
+# repo + workflow and mints a short-lived credential at run time; PEP 740
+# attestations (provenance) are attached automatically. Configure the trusted
+# publisher on PyPI first:
+#   pypi.org/manage/project/unplot/settings/publishing/ → add a GitHub publisher
+#     owner: somnai-dreams   repo: unplot   workflow: publish-pypi.yml
+# NOTE: "owner" is the GitHub org (somnai-dreams, hyphen) — not a PyPI username.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Verify before we ship — full suite incl. the raster path.
+      - run: pip install -e ".[test,raster]"
+      - run: pytest -q
+
+      # Build sdist + wheel, then trusted-publish.
+      - run: pip install build
+      - run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true # re-runs / already-published versions don't fail
