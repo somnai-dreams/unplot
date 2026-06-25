@@ -67,6 +67,7 @@ async function renderPage(i: number): Promise<void> {
   pdfCanvas.width = Math.ceil(viewport.width);
   pdfCanvas.height = Math.ceil(viewport.height);
   overlay.setAttribute("viewBox", `0 0 ${pdfCanvas.width} ${pdfCanvas.height}`);
+  stage.classList.remove("desat");   // new page renders in full colour, then greys when results come in
   const ctx = pdfCanvas.getContext("2d")!;
   await page.render({ canvasContext: ctx, viewport }).promise;
   stage.hidden = false;
@@ -106,6 +107,7 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
       overlay.appendChild(hit);
     }
   });
+  stage.classList.toggle("desat", cs.curves.length > 0);   // grey the source so the colour dots are the output
   if (animate && !reduceMotion) replayAnim(overlay as unknown as HTMLElement, "fade-in");
 }
 
@@ -233,6 +235,7 @@ async function run(animate = false): Promise<void> {
     setqaEl.innerHTML = `<span class="warn">extract failed: ${e instanceof Error ? e.message : String(e)}</span>`;
     tableWrap.hidden = true;
     overlay.replaceChildren();
+    stage.classList.remove("desat");
     dataplot.replaceChildren(); dataplot.removeAttribute("viewBox"); dataEmpty.hidden = false;
     csvBtn.disabled = true;
   }
