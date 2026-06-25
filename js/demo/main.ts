@@ -60,6 +60,8 @@ function buildPrior(): ShapePrior {
 
 async function renderPage(i: number): Promise<void> {
   if (!pdfDoc) return;
+  overlay.replaceChildren();   // clear the previous page's points immediately, before the async render/extract
+  selbox.hidden = true;
   const page = await pdfDoc.getPage(i + 1);   // pdf.js pages are 1-based
   const unscaled = page.getViewport({ scale: 1 });
   const avail = Math.max(240, stage.parentElement?.clientWidth ?? 760); // fit the stage container
