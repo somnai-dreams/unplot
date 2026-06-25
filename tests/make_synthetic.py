@@ -76,8 +76,8 @@ def build_gridded(path: str) -> dict:
     grid.finish(color=(0.7, 0.7, 0.7), width=0.5, closePath=False); grid.commit()
 
     truth: dict[str, float] = {}
-    nm = np.arange(400.0, 700.001, 2.0)
-    for name, color, peak, amp, sigma in LOBES:
+    nm = np.arange(400.0, 700.001, 0.5)   # finely sampled: per-segment dx is sub-pixel (guards the ruled
+    for name, color, peak, amp, sigma in LOBES:  # angle test against an absolute-tolerance regression)
         v = amp * np.exp(-0.5 * ((nm - peak) / sigma) ** 2)
         pts = [fitz.Point(_x_to_px(x), _v_to_py(val)) for x, val in zip(nm, v)]
         sh = page.new_shape(); sh.draw_polyline(pts); sh.finish(color=color, width=1.2, closePath=False); sh.commit()

@@ -96,7 +96,7 @@ function flatten(OPS: Record<string, number>, subOps: number[], coords: number[]
  *  path, not a data curve. Mirrors the Python `_is_ruled`: a Bezier disqualifies immediately, a polyline curve
  *  has diagonal flank segments, and a curve's flat baseline survives (its stroke also rises/falls). Catches a
  *  grid drawn as ONE stroke, which the thin-bbox check misses. */
-function isRuled(OPS: Record<string, number>, subOps: number[], coords: number[], ctm: Mat, tol = 0.75): boolean {
+function isRuled(OPS: Record<string, number>, subOps: number[], coords: number[], ctm: Mat, ang = 0.08): boolean {
   let i = 0;
   let cur: [number, number] | null = null;
   let sawLine = false;
@@ -106,8 +106,12 @@ function isRuled(OPS: Record<string, number>, subOps: number[], coords: number[]
     } else if (op === OPS.lineTo) {
       const next = apply(ctm, coords[i], coords[i + 1]); i += 2;
       if (cur) {
-        if (Math.abs(cur[0] - next[0]) > tol && Math.abs(cur[1] - next[1]) > tol) return false; // diagonal
-        sawLine = true;
+        const dx = Math.abs(cur[0] - next[0]), dy = Math.abs(cur[1] - next[1]);
+        const hi = Math.max(dx, dy);
+        if (hi >= 1e-3) {                                    // skip zero-length segments
+          if (Math.min(dx, dy) > ang * hi) return false;     // a diagonal segment -> could be data
+          sawLine = true;
+        }
       }
       cur = next;
     } else if (op === OPS.curveTo || op === OPS.curveTo2 || op === OPS.curveTo3) {

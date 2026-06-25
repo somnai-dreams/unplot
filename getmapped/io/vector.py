@@ -77,11 +77,13 @@ def _dash_style(dash: str | None) -> str:
     return "solid"
 
 
-def _is_ruled(d: dict, tol: float = 0.75) -> bool:
+def _is_ruled(d: dict, ang: float = 0.08) -> bool:
     """True if every drawn segment is an axis-aligned straight line — a grid / frame / ruled-line path, not a
     data curve. This catches a grid drawn as ONE stroke (its bbox is the whole frame, so the thin-bbox check
     misses it). A real curve is kept: a Bezier segment disqualifies immediately, and a polyline curve has
-    diagonal flank segments. A curve's flat baseline survives too, because the same stroke also rises/falls."""
+    diagonal flank segments. `ang` is an ANGLE ratio (min/max delta ~ tan of the off-axis angle), so the test
+    is independent of how finely the curve is sampled — an absolute tolerance falsely flags densely-sampled
+    curves whose per-segment deltas are sub-pixel."""
     saw_line = False
     for it in d["items"]:
         op = it[0]
@@ -89,8 +91,12 @@ def _is_ruled(d: dict, tol: float = 0.75) -> bool:
             return False
         if op == "l":
             p1, p2 = it[1], it[2]
-            if abs(p1.x - p2.x) > tol and abs(p1.y - p2.y) > tol:
-                return False                                 # a diagonal line -> could be data
+            dx, dy = abs(p1.x - p2.x), abs(p1.y - p2.y)
+            hi = max(dx, dy)
+            if hi < 1e-3:                                    # zero-length segment, uninformative
+                continue
+            if min(dx, dy) > ang * hi:
+                return False                                 # a diagonal segment -> could be data
             saw_line = True
     return saw_line
 
