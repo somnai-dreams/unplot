@@ -79,6 +79,9 @@ export type CurveSet = {
  *  The library never assigns these names; the caller owns the map. */
 export function labeled(cs: CurveSet, mapping: Record<number, string>): Record<string, Curve> {
   const out: Record<string, Curve> = {};
-  for (const c of cs.curves) if (c.orderIndex in mapping) out[mapping[c.orderIndex]] = c;
+  for (const c of cs.curves) {
+    const name = mapping[c.orderIndex];
+    if (name !== undefined) out[name] = c;
+  }
   return out;
 }

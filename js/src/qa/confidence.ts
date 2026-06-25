@@ -40,7 +40,7 @@ function crosses(A: Pt[], B: Pt[]): boolean {
   const xs = linspace(lo, hi, 32);
   const ya = interp(xs, ax, A.map((p) => p[1]));
   const yb = interp(xs, bx, B.map((p) => p[1]));
-  const s = xs.map((_, i) => Math.sign(ya[i] - yb[i])).filter((v) => v !== 0);
+  const s = xs.map((_, i) => Math.sign(ya[i]! - yb[i]!)).filter((v) => v !== 0);
   if (s.length <= 1) return false;
   for (let i = 1; i < s.length; i++) if (s[i] !== s[i - 1]) return true;
   return false;
@@ -50,7 +50,7 @@ export function countCrossings(curves: Curve[]): number {
   let n = 0;
   for (let i = 0; i < curves.length; i++)
     for (let j = i + 1; j < curves.length; j++)
-      if (crosses(curves[i].points, curves[j].points)) n++;
+      if (crosses(curves[i]!.points, curves[j]!.points)) n++;
   return n;
 }
 

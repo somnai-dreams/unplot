@@ -83,7 +83,7 @@ function curveColor(c: CurveSet["curves"][number], i: number): string {
     const [r, g, b] = c.style.color;
     return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
   }
-  return PALETTE[i % PALETTE.length];
+  return PALETTE[i % PALETTE.length]!;
 }
 
 const fmtVal = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(Math.abs(v) < 10 ? 2 : 1));
@@ -101,7 +101,7 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
     g.setAttribute("class", "curve"); g.setAttribute("data-c", String(i));
     const step = Math.max(1, Math.floor(c.pointsSrc.length / 11));
     for (let k = 0; k < c.pointsSrc.length; k += step) {
-      const cx = String(c.pointsSrc[k][0] * renderScale), cy = String(c.pointsSrc[k][1] * renderScale);
+      const cx = String(c.pointsSrc[k]![0] * renderScale), cy = String(c.pointsSrc[k]![1] * renderScale);
       const dot = document.createElementNS(NS, "circle");
       dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", "3");
       dot.setAttribute("fill", col); dot.setAttribute("stroke", "#fff"); dot.setAttribute("stroke-width", "1.2");
@@ -110,7 +110,7 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
       hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "9");
       hit.setAttribute("fill", "transparent"); hit.setAttribute("class", "hit");
       hit.setAttribute("data-c", String(i));
-      hit.setAttribute("data-x", fmtVal(c.points[k][0])); hit.setAttribute("data-y", fmtVal(c.points[k][1]));
+      hit.setAttribute("data-x", fmtVal(c.points[k]![0])); hit.setAttribute("data-y", fmtVal(c.points[k]![1]));
       g.appendChild(hit);
     }
     overlay.appendChild(g);
@@ -151,9 +151,9 @@ function renderDataPlot(cs: CurveSet, animate: boolean): void {
     p.push(`<polyline class="line" points="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" data-c="${i}"/>`);
     const step = Math.max(1, Math.floor(c.points.length / 11));
     for (let k = 0; k < c.points.length; k += step) {
-      const cx = mapX(c.points[k][0]).toFixed(1), cy = mapY(c.points[k][1]).toFixed(1);
+      const cx = mapX(c.points[k]![0]).toFixed(1), cy = mapY(c.points[k]![1]).toFixed(1);
       p.push(`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${col}" stroke="#fff" stroke-width="1"/>`);
-      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-c="${i}" data-x="${fmtVal(c.points[k][0])}" data-y="${fmtVal(c.points[k][1])}"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-c="${i}" data-x="${fmtVal(c.points[k]![0])}" data-y="${fmtVal(c.points[k]![1])}"/>`);
     }
     p.push(`</g>`);
   });
@@ -201,7 +201,7 @@ function wireHover(svg: SVGElement): void {
 
 function peakX(c: CurveSet["curves"][number]): number {
   let k = 0;
-  for (let j = 1; j < c.points.length; j++) if (c.points[j][1] > c.points[k][1]) k = j;
+  for (let j = 1; j < c.points.length; j++) if (c.points[j]![1] > c.points[k]![1]) k = j;
   return c.points[k]?.[0] ?? NaN;
 }
 
@@ -254,7 +254,7 @@ function currentOpts() {
 async function run(animate = false): Promise<void> {
   if (!pdfData) return;
   try {
-    const cs = await extract(pdfData, { page: pageIndex, frame: frameSel ?? undefined, ...currentOpts() });
+    const cs = await extract(pdfData, { page: pageIndex, ...(frameSel ? { frame: frameSel } : {}), ...currentOpts() });
     lastSet = cs;
     drawOverlay(cs, animate);
     renderDataPlot(cs, animate);
@@ -328,7 +328,7 @@ async function extractAll(): Promise<void> {
     const sets: (CurveSet | null)[] = [];
     for (let i = 0; i < numPages; i++) {
       const frame = await autoBoxFrame(i);   // each page frames itself (first plot if multi-plot)
-      try { sets.push(await extract(pdfData, { page: i, frame, ...opts })); }
+      try { sets.push(await extract(pdfData, { page: i, ...(frame ? { frame } : {}), ...opts })); }
       catch { sets.push(null); }   // a page with no curve paths -> no result for that page
     }
     allSets = sets;

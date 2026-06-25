@@ -17,44 +17,44 @@ export function monoXSegments(P: Pt[]): Pt[][] {
   const segs: Pt[][] = [];
   let s = 0, dir = 0;
   for (let i = 1; i < P.length; i++) {
-    const d = P[i][0] - P[i - 1][0];
+    const d = P[i]![0] - P[i - 1]![0];
     if (Math.abs(d) < 1e-9) continue;
     const sd = d > 0 ? 1 : -1;
     if (dir === 0) dir = sd;
     else if (sd !== dir) { segs.push(P.slice(s, i)); s = i - 1; dir = sd; }
   }
   segs.push(P.slice(s));
-  return segs.map((seg) => (seg[seg.length - 1][0] < seg[0][0] ? [...seg].reverse() : seg));
+  return segs.map((seg) => (seg[seg.length - 1]![0] < seg[0]![0] ? [...seg].reverse() : seg));
 }
 
 /** True if joining cur's END to t's START sits at a VALLEY (the join is lower in data than its neighbours both
  *  back and forward) — two lobes meeting at the baseline, not a broken stroke continuing the same way. */
 function isValleyJoin(cur: Pt[], t: Pt[], k = 8, margin = 2.0): boolean {
   const n = cur.length;
-  const yb = n > 1 ? mean(cur.slice(Math.max(0, n - k - 1), n - 1).map((p) => p[1])) : cur[n - 1][1];
-  const ya = t.length > 1 ? mean(t.slice(1, k + 1).map((p) => p[1])) : t[0][1];
-  const ey = cur[n - 1][1];
+  const yb = n > 1 ? mean(cur.slice(Math.max(0, n - k - 1), n - 1).map((p) => p[1])) : cur[n - 1]![1];
+  const ya = t.length > 1 ? mean(t.slice(1, k + 1).map((p) => p[1])) : t[0]![1];
+  const ey = cur[n - 1]![1];
   return ey > yb + margin && ey > ya + margin;
 }
 
 /** Chain x-increasing segments where one's END ~ next's START — rebuilds a broken stroke, but refuses a valley
  *  join so two adjacent lobes meeting at the baseline are not merged into one full-width curve. */
 export function chainCurves(segs: Pt[][], xtol = 4, ytol = 6): Pt[][] {
-  const s = [...segs].sort((a, b) => a[0][0] - b[0][0]);
+  const s = [...segs].sort((a, b) => a[0]![0] - b[0]![0]);
   const used = new Array(s.length).fill(false);
   const curves: Pt[][] = [];
   for (let i = 0; i < s.length; i++) {
     if (used[i]) continue;
-    let cur = [...s[i]];
+    let cur = [...s[i]!];
     used[i] = true;
     let changed = true;
     while (changed) {
       changed = false;
-      const [ex, ey] = cur[cur.length - 1];
+      const [ex, ey] = cur[cur.length - 1]!;
       for (let j = 0; j < s.length; j++) {
         if (used[j]) continue;
-        const t = s[j];
-        if (Math.abs(t[0][0] - ex) < xtol && Math.abs(t[0][1] - ey) < ytol && !isValleyJoin(cur, t)) {
+        const t = s[j]!;
+        if (Math.abs(t[0]![0] - ex) < xtol && Math.abs(t[0]![1] - ey) < ytol && !isValleyJoin(cur, t)) {
           cur = cur.concat(t);
           used[j] = true;
           changed = true;
@@ -72,18 +72,18 @@ export function chainCurves(segs: Pt[][], xtol = 4, ytol = 6): Pt[][] {
 export function splitLobes(curve: Pt[], depthFrac = 0.35, minPts = 12): Pt[][] {
   const h = curve.map((p) => -p[1]);
   const hmin = Math.min(...h);
-  for (let i = 0; i < h.length; i++) h[i] -= hmin;
+  for (let i = 0; i < h.length; i++) h[i] = h[i]! - hmin;
   const hmax = Math.max(...h);
   if (hmax <= 0) return [curve];
   const peaks: number[] = [];
-  for (let i = 1; i < h.length - 1; i++) if (h[i] >= h[i - 1] && h[i] >= h[i + 1] && h[i] > 0.15 * hmax) peaks.push(i);
+  for (let i = 1; i < h.length - 1; i++) if (h[i]! >= h[i - 1]! && h[i]! >= h[i + 1]! && h[i]! > 0.15 * hmax) peaks.push(i);
   if (peaks.length < 2) return [curve];
   const splits: number[] = [];
   for (let p = 0; p < peaks.length - 1; p++) {
-    const a = peaks[p], b = peaks[p + 1];
+    const a = peaks[p]!, b = peaks[p + 1]!;
     let v = a;
-    for (let i = a; i <= b; i++) if (h[i] < h[v]) v = i;
-    if (h[v] < depthFrac * Math.min(h[a], h[b])) splits.push(v);
+    for (let i = a; i <= b; i++) if (h[i]! < h[v]!) v = i;
+    if (h[v]! < depthFrac * Math.min(h[a]!, h[b]!)) splits.push(v);
   }
   if (!splits.length) return [curve];
   const out: Pt[][] = [];

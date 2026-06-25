@@ -18,22 +18,22 @@ export function median(a: number[]): number {
   if (!a.length) return 0;
   const s = [...a].sort((x, y) => x - y);
   const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
 
 export function argmax(a: number[]): number {
   let k = 0;
-  for (let i = 1; i < a.length; i++) if (a[i] > a[k]) k = i;
+  for (let i = 1; i < a.length; i++) if (a[i]! > a[k]!) k = i;
   return k;
 }
 export function argmin(a: number[]): number {
   let k = 0;
-  for (let i = 1; i < a.length; i++) if (a[i] < a[k]) k = i;
+  for (let i = 1; i < a.length; i++) if (a[i]! < a[k]!) k = i;
   return k;
 }
 
 /** First difference: out[i] = a[i+1] - a[i]. */
-export const diff = (a: number[]): number[] => a.slice(1).map((x, i) => x - a[i]);
+export const diff = (a: number[]): number[] => a.slice(1).map((x, i) => x - a[i]!);
 
 export function linspace(lo: number, hi: number, n: number): number[] {
   if (n <= 1) return [lo];
@@ -45,12 +45,12 @@ export function linspace(lo: number, hi: number, n: number): number[] {
 /** numpy.interp: piecewise-linear interpolation of (xp, fp) at each xs; xp ascending, ends clamped. */
 export function interp(xs: number[], xp: number[], fp: number[]): number[] {
   return xs.map((x) => {
-    if (x <= xp[0]) return fp[0];
-    if (x >= xp[xp.length - 1]) return fp[fp.length - 1];
+    if (x <= xp[0]!) return fp[0]!;
+    if (x >= xp[xp.length - 1]!) return fp[fp.length - 1]!;
     let i = 1;
-    while (i < xp.length && xp[i] < x) i++;
-    const t = (x - xp[i - 1]) / (xp[i] - xp[i - 1]);
-    return fp[i - 1] + t * (fp[i] - fp[i - 1]);
+    while (i < xp.length && xp[i]! < x) i++;
+    const t = (x - xp[i - 1]!) / (xp[i]! - xp[i - 1]!);
+    return fp[i - 1]! + t * (fp[i]! - fp[i - 1]!);
   });
 }
 
@@ -59,8 +59,8 @@ export function linfit(xs: number[], ys: number[]): [number, number] {
   const mx = mean(xs), my = mean(ys);
   let num = 0, den = 0;
   for (let i = 0; i < xs.length; i++) {
-    num += (xs[i] - mx) * (ys[i] - my);
-    den += (xs[i] - mx) ** 2;
+    num += (xs[i]! - mx) * (ys[i]! - my);
+    den += (xs[i]! - mx) ** 2;
   }
   const m = den === 0 ? 0 : num / den;
   return [m, my - m * mx];
@@ -71,7 +71,7 @@ export function pearson(xs: number[], ys: number[]): number {
   const mx = mean(xs), my = mean(ys);
   let sxy = 0, sxx = 0, syy = 0;
   for (let i = 0; i < xs.length; i++) {
-    const dx = xs[i] - mx, dy = ys[i] - my;
+    const dx = xs[i]! - mx, dy = ys[i]! - my;
     sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
   }
   const d = Math.sqrt(sxx * syy);

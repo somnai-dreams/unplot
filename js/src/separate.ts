@@ -11,9 +11,9 @@
  * Returns candidates in SOURCE coords (unordered); extract() calibrates, then orders in data space.
  */
 import { chainCurves, monoXSegments, type Pt, splitLobes, xSorted } from "./curves/vectorpaths.ts";
-import type { RawPath } from "./io/vector.ts";
+import type { Dash, RawPath } from "./io/vector.ts";
 
-export type Candidate = [string | null, [number, number, number] | null, Pt[]]; // (dash, color, pts_src)
+export type Candidate = [Dash | null, [number, number, number] | null, Pt[]]; // (dash, color, pts_src)
 export type Method = "auto" | "style" | "defan";
 export type DefanCfg = { minSeg: number; minCurve: number; minPathSegs: number };
 
@@ -25,11 +25,11 @@ export const DEFAN_POLYLINE: DefanCfg = { minSeg: 20, minCurve: 20, minPathSegs:
 const styleKey = (rp: RawPath): string => `${rp.dash}|${rp.color ? rp.color.join(",") : ""}`;
 
 function byStyle(rawpaths: RawPath[]): Candidate[] {
-  const groups = new Map<string, { dash: string | null; color: [number, number, number] | null; pts: Pt[] }>();
+  const groups = new Map<string, { dash: Dash | null; color: [number, number, number] | null; pts: Pt[] }>();
   for (const rp of rawpaths) {
     const k = styleKey(rp);
     const g = groups.get(k) ?? { dash: rp.dash, color: rp.color, pts: [] };
-    for (const p of rp.pts) g.pts.push([p[0], p[1]]);
+    for (const p of rp.pts) g.pts.push([p[0]!, p[1]!]);
     groups.set(k, g);
   }
   return [...groups.values()].map((g) => [g.dash, g.color, xSorted(g.pts)] as Candidate);

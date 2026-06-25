@@ -14,9 +14,9 @@ describe("gridline removal (ruled-path filter)", () => {
     expect(cs.curves.every((c) => c.qa.confidence > 0.9)).toBe(true);
     const peaks = cs.curves.map((c) => {
       const ys = c.points.map((p) => p[1]);
-      return c.points[ys.indexOf(Math.max(...ys))][0];
+      return c.points[ys.indexOf(Math.max(...ys))]![0];
     });
-    [450, 550, 650].forEach((want, i) => expect(Math.abs(peaks[i] - want)).toBeLessThanOrEqual(6));
+    [450, 550, 650].forEach((want, i) => expect(Math.abs(peaks[i]! - want)).toBeLessThanOrEqual(6));
   });
 
   it("flags the grid path as ruled and drops it from pathsInFrame", async () => {

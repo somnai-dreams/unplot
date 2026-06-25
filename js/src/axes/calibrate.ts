@@ -54,11 +54,11 @@ export function unfoldSymmetric(anchors: Anchors, axis: "x" | "y"): Anchors {
   const n = vals.length;
   if (n < 5 || vals.some((v) => v < 0)) return anchors;
   let ti = 0;
-  for (let i = 1; i < n; i++) if (vals[i] < vals[ti]) ti = i; // turning point = smallest |value|
-  if (ti === 0 || ti === n - 1 || vals[ti] > 0.25 * maxOf(vals)) return anchors; // not interior / not ~0
+  for (let i = 1; i < n; i++) if (vals[i]! < vals[ti]!) ti = i; // turning point = smallest |value|
+  if (ti === 0 || ti === n - 1 || vals[ti]! > 0.25 * maxOf(vals)) return anchors; // not interior / not ~0
   const left = vals.slice(0, ti + 1), right = vals.slice(ti);
-  const nonInc = (arr: number[]): boolean => arr.every((v, i) => i === 0 || arr[i - 1] >= v);
-  const nonDec = (arr: number[]): boolean => arr.every((v, i) => i === 0 || arr[i - 1] <= v);
+  const nonInc = (arr: number[]): boolean => arr.every((v, i) => i === 0 || arr[i - 1]! >= v);
+  const nonDec = (arr: number[]): boolean => arr.every((v, i) => i === 0 || arr[i - 1]! <= v);
   if (!(nonInc(left) && nonDec(right))) return anchors;
   // a genuine ±-fold has MIRROR arms (comparable magnitudes + lengths). If the arms are wildly different it's
   // a stray outlier label faking a V (e.g. an x-axis number bleeding into the y-band), not a fold.
@@ -78,14 +78,15 @@ export function robustFit(anchors: Anchors): [number, number, number, number] {
   if (a.length < 2) throw new CalibrationError(`need >=2 numeric anchors to calibrate an axis, got ${a.length}`);
   const pos = a.map((p) => p[0]), val = a.map((p) => p[1]);
   if (a.length === 2) {
-    const m = (val[1] - val[0]) / (pos[1] - pos[0]);
-    return [m, val[0] - m * pos[0], 1.0, 0];
+    const m = (val[1]! - val[0]!) / (pos[1]! - pos[0]!);
+    return [m, val[0]! - m * pos[0]!, 1.0, 0];
   }
-  const slopes = diff(val).map((dv, i) => dv / diff(pos)[i]);
+  const dpos = diff(pos);
+  const slopes = diff(val).map((dv, i) => dv / dpos[i]!);
   const m = median(slopes);
-  const b = median(val.map((v, i) => v - m * pos[i]));
+  const b = median(val.map((v, i) => v - m * pos[i]!));
   const span = Math.max(maxOf(val) - minOf(val), 1e-9);
-  const keep = val.map((v, i) => Math.abs(v - (m * pos[i] + b)) < 0.1 * span + 1e-6);
+  const keep = val.map((v, i) => Math.abs(v - (m * pos[i]! + b)) < 0.1 * span + 1e-6);
   const nKeep = keep.filter(Boolean).length;
   let scale: number, offset: number, rOut: number, nDropped: number, gpos: number[], gval: number[];
   if (nKeep >= 2) {

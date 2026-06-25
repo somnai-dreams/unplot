@@ -21,13 +21,13 @@ export function flankViolation(points: Pt[]): [number, number | null] {
   const pk = argmax(ys);
   let rv = 0, rmax = -1e9, rvAt: number | null = null;
   for (let i = 0; i <= pk; i++) { // rising flank: should be non-decreasing
-    rmax = Math.max(rmax, ys[i]);
-    if (rmax - ys[i] > rv) { rv = rmax - ys[i]; rvAt = xs[i]; }
+    rmax = Math.max(rmax, ys[i]!);
+    if (rmax - ys[i]! > rv) { rv = rmax - ys[i]!; rvAt = xs[i]!; }
   }
   let fv = 0, rmin = 1e9, fvAt: number | null = null;
   for (let i = pk; i < ys.length; i++) { // falling flank: should be non-increasing
-    rmin = Math.min(rmin, ys[i]);
-    if (ys[i] - rmin > fv) { fv = ys[i] - rmin; fvAt = xs[i]; }
+    rmin = Math.min(rmin, ys[i]!);
+    if (ys[i]! - rmin > fv) { fv = ys[i]! - rmin; fvAt = xs[i]!; }
   }
   return rv >= fv ? [rv / amp, rvAt] : [fv / amp, fvAt];
 }
@@ -47,9 +47,9 @@ export function backtrack(points: Pt[], direction: "auto" | "up" | "down" = "aut
   }
   let worst = 0, worstAt: number | null = null, run = 0;
   for (let i = 0; i < d.length; i++) {
-    const against = (dir === "up" && d[i] < 0) || (dir === "down" && d[i] > 0);
-    run = against ? run + Math.abs(d[i]) : 0;
-    if (run > worst) { worst = run; worstAt = xs[i + 1]; }
+    const against = (dir === "up" && d[i]! < 0) || (dir === "down" && d[i]! > 0);
+    run = against ? run + Math.abs(d[i]!) : 0;
+    if (run > worst) { worst = run; worstAt = xs[i + 1]!; }
   }
   return [worst / rng, worstAt];
 }
@@ -62,7 +62,7 @@ export function curvature(points: Pt[]): [number, number | null] {
   if (rng <= 1e-9) return [0, null];
   const d2 = diff(diff(ys)).map(Math.abs);
   const j = argmax(d2);
-  return [d2[j] / rng, xs[j + 1]];
+  return [d2[j]! / rng, xs[j + 1]!];
 }
 
 /** Largest gap between consecutive x values (data units) — a coverage-hole signal. */

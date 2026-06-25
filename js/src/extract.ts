@@ -36,13 +36,13 @@ function finalize(pSrc: Pt[], xAxis: AxisCalibration, yAxis: AxisCalibration): [
   const rows = pSrc.map((p) => ({ sx: p[0], sy: p[1], xd: toData(xAxis, p[0]), yd: toData(yAxis, p[1]) }));
   rows.sort((a, b) => a.xd - b.xd);
   const out: typeof rows = []; // keep strictly-increasing x against the last KEPT row (drop folds)
-  for (const r of rows) if (!out.length || r.xd > out[out.length - 1].xd + 1e-9) out.push(r);
+  for (const r of rows) if (!out.length || r.xd > out[out.length - 1]!.xd + 1e-9) out.push(r);
   return [out.map((r) => [r.xd, r.yd] as Pt), out.map((r) => [r.sx, r.sy] as Pt)];
 }
 
 function orderKey(pointsData: Pt[], orderBy: OrderBy): number {
   const x = pointsData.map((p) => p[0]), y = pointsData.map((p) => p[1]);
-  if (orderBy === "peak-x") return x[argmax(y)];
+  if (orderBy === "peak-x") return x[argmax(y)]!;
   if (orderBy === "mean-y") return mean(y);
   return minOf(x); // first-x
 }
@@ -70,7 +70,7 @@ function buildCurves(
   return built.map((b, k) => ({
     id: `c${k}`,
     orderIndex: k,
-    style: { dash: (b.dash as Curve["style"]["dash"]) ?? null, color: b.color, width: null },
+    style: { dash: b.dash, color: b.color, width: null },
     points: b.pdata,
     pointsSrc: b.psrc,
     method: methodLabel,
@@ -90,7 +90,9 @@ export function extractFromPage(page: VectorPage, opts: ExtractOpts = {}): Curve
   const xCal = calibrateAxis(page.words, frame, "x", opts.xAxis === "auto" || opts.xAxis === undefined ? undefined : opts.xAxis);
   const yCal = calibrateAxis(page.words, frame, "y", opts.yAxis === "auto" || opts.yAxis === undefined ? undefined : opts.yAxis);
   const raw = pathsInFrame(page, frame, minSegs);
-  const [cands, method] = separate(raw, { expectedCurves, split: opts.split ?? false, defan: opts.defan });
+  const [cands, method] = separate(raw, {
+    expectedCurves, split: opts.split ?? false, ...(opts.defan ? { defan: opts.defan } : {}),
+  });
   const label: Method = method === "style" ? "vector-path" : "vector-defan-chain";
   const curves = buildCurves(cands, xCal, yCal, orderBy, prior, label, expectedCurves);
 

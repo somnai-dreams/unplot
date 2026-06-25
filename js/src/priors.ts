@@ -35,8 +35,8 @@ const TREND = 40; // window for the established-direction estimate — long enou
 function heightStep(prefix: Pt[], cand: Pt): [number, number, number] {
   const h = prefix.map((p) => -p[1]);
   const win = h.slice(-TREND);
-  const trend = win[win.length - 1] - win[0];
-  const step = -cand[1] - h[h.length - 1];
+  const trend = win[win.length - 1]! - win[0]!;
+  const step = -cand[1] - h[h.length - 1]!;
   return [trend, step, argmax(h)];
 }
 

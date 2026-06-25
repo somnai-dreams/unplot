@@ -11,7 +11,7 @@ import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export type Dash = "solid" | "dashed" | "dashdot";
 
-export interface RawPath {
+export type RawPath = {
   pts: number[][]; // [[x, y], ...] flattened, source coords (pt, y-down)
   dash: Dash;
   color: [number, number, number] | null; // 0..1 RGB if non-grey, else null
@@ -19,17 +19,28 @@ export interface RawPath {
   height: number; // bbox height
   nSegs: number; // drawn segment count
   ruled: boolean; // every segment axis-aligned & straight -> grid / frame / ruled line, not a curve
-}
+};
 
-export interface Word {
+export type Word = {
   x0: number; y0: number; x1: number; y1: number; text: string;
-}
+};
 
-export interface VectorPage {
+export type VectorPage = {
   paths: RawPath[];
   words: Word[];
   rect: [number, number, number, number]; // x0,y0,x1,y1 (pt)
-}
+};
+
+// The subset of pdf.js operator codes the walker reads. pdf.js types `OPS` loosely, so we name the codes we
+// use and cast through `unknown` once, rather than dot-accessing an index signature everywhere.
+type PdfOps = {
+  save: number; restore: number; transform: number;
+  setLineWidth: number; setStrokeRGBColor: number; setDash: number;
+  constructPath: number; fill: number; eoFill: number; endPath: number;
+  stroke: number; closeStroke: number;
+  moveTo: number; lineTo: number; curveTo: number; curveTo2: number; curveTo3: number; rectangle: number;
+};
+const OPS = (pdfjs as unknown as { OPS: PdfOps }).OPS;
 
 type Mat = [number, number, number, number, number, number]; // a,b,c,d,e,f
 
@@ -40,13 +51,13 @@ const mul = (m: Mat, n: Mat): Mat => [
 ];
 const apply = (m: Mat, x: number, y: number): [number, number] => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 
-function bezier(p0: number[], p1: number[], p2: number[], p3: number[], n = 24): number[][] {
-  const out: number[][] = [];
+function bezier(p0: number[], p1: number[], p2: number[], p3: number[], n = 24): [number, number][] {
+  const out: [number, number][] = [];
   for (let i = 1; i <= n; i++) {
     const t = i / n, u = 1 - t;
     out.push([
-      u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
-      u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+      u * u * u * p0[0]! + 3 * u * u * t * p1[0]! + 3 * u * t * t * p2[0]! + t * t * t * p3[0]!,
+      u * u * u * p0[1]! + 3 * u * u * t * p1[1]! + 3 * u * t * t * p2[1]! + t * t * t * p3[1]!,
     ]);
   }
   return out;
@@ -59,7 +70,7 @@ function dashStyle(dashArray: number[] | null | undefined): Dash {
 }
 
 /** Flatten a constructPath (subOps + flat coords) into device-space points under the current CTM. */
-function flatten(OPS: Record<string, number>, subOps: number[], coords: number[], ctm: Mat, H: number): number[][] {
+function flatten(subOps: number[], coords: number[], ctm: Mat, H: number): number[][] {
   const pts: number[][] = [];
   let i = 0;
   let cur: number[] = [0, 0];
@@ -70,22 +81,23 @@ function flatten(OPS: Record<string, number>, subOps: number[], coords: number[]
   };
   for (const op of subOps) {
     if (op === OPS.moveTo || op === OPS.lineTo) {
-      push(coords[i], coords[i + 1]); i += 2;
+      push(coords[i]!, coords[i + 1]!); i += 2;
     } else if (op === OPS.curveTo) {
-      const p0 = cur, p1 = [coords[i], coords[i + 1]], p2 = [coords[i + 2], coords[i + 3]], p3 = [coords[i + 4], coords[i + 5]];
+      const p0 = cur, p1 = [coords[i]!, coords[i + 1]!], p2 = [coords[i + 2]!, coords[i + 3]!], p3 = [coords[i + 4]!, coords[i + 5]!];
       for (const [x, y] of bezier(p0, p1, p2, p3)) { const [dx, dy] = apply(ctm, x, y); pts.push([dx, H - dy]); }
       cur = p3; i += 6;
     } else if (op === OPS.curveTo2) {
-      const p0 = cur, p1 = cur, p2 = [coords[i], coords[i + 1]], p3 = [coords[i + 2], coords[i + 3]];
+      const p0 = cur, p1 = cur, p2 = [coords[i]!, coords[i + 1]!], p3 = [coords[i + 2]!, coords[i + 3]!];
       for (const [x, y] of bezier(p0, p1, p2, p3)) { const [dx, dy] = apply(ctm, x, y); pts.push([dx, H - dy]); }
       cur = p3; i += 4;
     } else if (op === OPS.curveTo3) {
-      const p0 = cur, p1 = [coords[i], coords[i + 1]], p2 = [coords[i + 2], coords[i + 3]], p3 = p2;
+      const p0 = cur, p1 = [coords[i]!, coords[i + 1]!], p2 = [coords[i + 2]!, coords[i + 3]!], p3 = p2;
       for (const [x, y] of bezier(p0, p1, p2, p3)) { const [dx, dy] = apply(ctm, x, y); pts.push([dx, H - dy]); }
       cur = p3; i += 4;
     } else if (op === OPS.rectangle) {
-      const x = coords[i], y = coords[i + 1], w = coords[i + 2], h = coords[i + 3]; i += 4;
-      for (const [px, py] of [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]]) { const [dx, dy] = apply(ctm, px, py); pts.push([dx, H - dy]); }
+      const x = coords[i]!, y = coords[i + 1]!, w = coords[i + 2]!, h = coords[i + 3]!; i += 4;
+      const corners: [number, number][] = [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]];
+      for (const [px, py] of corners) { const [dx, dy] = apply(ctm, px, py); pts.push([dx, H - dy]); }
       cur = [x, y];
     } // closePath: no coords
   }
@@ -96,15 +108,15 @@ function flatten(OPS: Record<string, number>, subOps: number[], coords: number[]
  *  path, not a data curve. Mirrors the Python `_is_ruled`: a Bezier disqualifies immediately, a polyline curve
  *  has diagonal flank segments, and a curve's flat baseline survives (its stroke also rises/falls). Catches a
  *  grid drawn as ONE stroke, which the thin-bbox check misses. */
-function isRuled(OPS: Record<string, number>, subOps: number[], coords: number[], ctm: Mat, ang = 0.08): boolean {
+function isRuled(subOps: number[], coords: number[], ctm: Mat, ang = 0.08): boolean {
   let i = 0;
   let cur: [number, number] | null = null;
   let sawLine = false;
   for (const op of subOps) {
     if (op === OPS.moveTo) {
-      cur = apply(ctm, coords[i], coords[i + 1]); i += 2;
+      cur = apply(ctm, coords[i]!, coords[i + 1]!); i += 2;
     } else if (op === OPS.lineTo) {
-      const next = apply(ctm, coords[i], coords[i + 1]); i += 2;
+      const next = apply(ctm, coords[i]!, coords[i + 1]!); i += 2;
       if (cur) {
         const dx = Math.abs(cur[0] - next[0]), dy = Math.abs(cur[1] - next[1]);
         const hi = Math.max(dx, dy);
@@ -117,17 +129,21 @@ function isRuled(OPS: Record<string, number>, subOps: number[], coords: number[]
     } else if (op === OPS.curveTo || op === OPS.curveTo2 || op === OPS.curveTo3) {
       return false; // a Bezier -> a real curve
     } else if (op === OPS.rectangle) {
-      cur = apply(ctm, coords[i], coords[i + 1]); i += 4; sawLine = true; // axis-aligned box (e.g. the frame)
+      cur = apply(ctm, coords[i]!, coords[i + 1]!); i += 4; sawLine = true; // axis-aligned box (e.g. the frame)
     }
     // closePath: no coords
   }
   return sawLine;
 }
 
-function rgbObj(a: any): [number, number, number] {
-  if (Array.isArray(a)) return [a[0], a[1], a[2]];
-  return [a[0] ?? a["0"], a[1] ?? a["1"], a[2] ?? a["2"]];
+/** Read a 3-component RGB out of a pdf.js colour arg (an array, or an object keyed 0/1/2). */
+function rgbObj(a: unknown): [number, number, number] {
+  const o = a as Record<number, number>;
+  return [o[0] ?? 0, o[1] ?? 0, o[2] ?? 0];
 }
+
+// The fields the walker reads off a pdf.js text item; cast through this rather than `any`.
+type TextItemLite = { str?: string; transform?: number[]; width?: number; height?: number };
 
 export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0.15): Promise<VectorPage> {
   // pdf.js TRANSFERS (detaches) the input buffer to its worker — pass a copy so the caller can reuse `data`
@@ -135,8 +151,7 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
   const doc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
   const page = await doc.getPage(pageNum + 1);
   const view = page.view as number[]; // [x0,y0,x1,y1] in pt
-  const H = view[3] - view[1];
-  const OPS = (pdfjs as any).OPS as Record<string, number>;
+  const H = view[3]! - view[1]!;
   const ops = await page.getOperatorList();
 
   const paths: RawPath[] = [];
@@ -154,7 +169,7 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
     else if (fn === OPS.restore) { const s = stack.pop(); if (s) ({ ctm, color: strokeColor, dash, width } = s); }
     else if (fn === OPS.transform) ctm = mul(ctm, args as Mat);
     else if (fn === OPS.setLineWidth) width = args[0];
-    else if (fn === OPS.setStrokeRGBColor) strokeColor = rgbObj(args).map((c: number) => c / 255) as [number, number, number];
+    else if (fn === OPS.setStrokeRGBColor) strokeColor = rgbObj(args).map((c) => c / 255) as [number, number, number];
     else if (fn === OPS.setDash) dash = args[0];
     else if (fn === OPS.constructPath) {
       // a path may be built by several constructPath ops before it's painted — accumulate, don't overwrite
@@ -164,9 +179,9 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
     } else if (fn === OPS.fill || fn === OPS.eoFill || fn === OPS.endPath) pending = null; // discard non-stroked paths
     else if (fn === OPS.stroke || fn === OPS.closeStroke) {
       if (pending) {
-        const pts = flatten(OPS, pending.subOps, pending.coords, ctm, H);
+        const pts = flatten(pending.subOps, pending.coords, ctm, H);
         if (pts.length) {
-          const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+          const xs = pts.map((p) => p[0]!), ys = pts.map((p) => p[1]!);
           const [mn, mx] = [Math.min(...strokeColor), Math.max(...strokeColor)];
           paths.push({
             pts, dash: dashStyle(dash),
@@ -174,7 +189,7 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
             width: Math.max(...xs) - Math.min(...xs),
             height: Math.max(...ys) - Math.min(...ys),
             nSegs: pending.subOps.filter((o) => o !== OPS.moveTo).length,
-            ruled: isRuled(OPS, pending.subOps, pending.coords, ctm),
+            ruled: isRuled(pending.subOps, pending.coords, ctm),
           });
         }
         pending = null;
@@ -184,19 +199,21 @@ export async function loadVectorPage(data: Uint8Array, pageNum = 0, colorSat = 0
 
   const tc = await page.getTextContent();
   const words: Word[] = [];
-  for (const item of tc.items as any[]) {
-    if (!item.str || !item.str.trim()) continue;
-    const [, , , , e, f] = item.transform as number[];
+  for (const item of tc.items as TextItemLite[]) {
+    const transform = item.transform;
+    if (!item.str || !item.str.trim() || !transform) continue;
+    const e = transform[4]!, f = transform[5]!;
     const w = item.width ?? 0, h = item.height ?? 8;
     words.push({ x0: e, y0: H - (f + h), x1: e + w, y1: H - f, text: item.str.trim() });
   }
-  return { paths, words, rect: [view[0], 0, view[2], H] };
+  return { paths, words, rect: [view[0]!, 0, view[2]!, H] };
 }
 
 /** [x0,y0,x1,y1] bounding box of a flattened path's points. */
 export function pathBbox(pts: number[][]): [number, number, number, number] {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const [x, y] of pts) {
+  for (const p of pts) {
+    const x = p[0]!, y = p[1]!;
     if (x < x0) x0 = x; if (x > x1) x1 = x;
     if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
@@ -208,7 +225,8 @@ export function pathBbox(pts: number[][]): [number, number, number, number] {
 function isBox(pts: number[][], bb: [number, number, number, number], frac = 0.9, tol = 3.0): boolean {
   const [bx0, by0, bx1, by1] = bb;
   let near = 0;
-  for (const [x, y] of pts) {
+  for (const p of pts) {
+    const x = p[0]!, y = p[1]!;
     if (Math.abs(x - bx0) < tol || Math.abs(x - bx1) < tol || Math.abs(y - by0) < tol || Math.abs(y - by1) < tol) near++;
   }
   return pts.length > 0 && near / pts.length > frac;
