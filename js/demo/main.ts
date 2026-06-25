@@ -6,7 +6,7 @@
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extract, free, lobe, monotone, type OrderBy, type ShapePrior, smooth } from "../src/index.ts";
 import type { CurveSet } from "../src/index.ts";
-import { loadVectorPage, pathBbox } from "../src/io/vector.ts";
+import { loadVectorPage, pathBbox, type VectorPage } from "../src/io/vector.ts";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("./pdf.worker.js", import.meta.url).toString();
 
@@ -35,6 +35,7 @@ let renderScale = 1;
 let lastSet: CurveSet | null = null;
 let allSets: (CurveSet | null)[] | null = null;   // populated by "Extract all pages"; null = single-page mode
 let frameSel: [number, number, number, number] | null = null;   // selected ROI in source pt; null = auto-frame
+let multiPlot = false;                                           // current page holds several plots (auto-picked one)
 let selecting = false, dragged = false, selStart: [number, number] | null = null;
 
 /** Re-trigger a CSS keyframe animation by removing the class, forcing reflow, and re-adding it. */
@@ -197,9 +198,9 @@ async function load(data: Uint8Array): Promise<void> {
     pdfDoc = await pdfjs.getDocument({ data: data.slice(), useSystemFonts: true, isEvalSupported: false }).promise; // copy: pdf.js detaches the buffer
     numPages = pdfDoc.numPages;
     pageIndex = 0;
-    frameSel = null; selbox.hidden = true;
     updatePageUi();
     await renderPage(0);
+    await autoFrame();      // a multi-plot page -> show one plot, not the tangled whole page
     await run(true);        // first draw of a new PDF: animate the curves in
     updateRegionBar();
   } finally {
@@ -221,10 +222,10 @@ async function goToPage(i: number): Promise<void> {
   const t = Math.max(0, Math.min(numPages - 1, i));
   if (t === pageIndex || !pdfDoc) return;
   pageIndex = t;
-  frameSel = null; selbox.hidden = true;   // a region is page-specific; reset on page change
   updatePageUi();
   highlightPageRow();
   await renderPage(pageIndex);
+  await autoFrame();        // region is page-specific; re-pick (first plot on a multi-plot page)
   await run(true);          // a new page is a new result — animate it in
   updateRegionBar();
 }
@@ -244,7 +245,8 @@ async function extractAll(): Promise<void> {
     const opts = currentOpts();
     const sets: (CurveSet | null)[] = [];
     for (let i = 0; i < numPages; i++) {
-      try { sets.push(await extract(pdfData, { page: i, frame: frameSel ?? undefined, ...opts })); }
+      const frame = await autoBoxFrame(i);   // each page frames itself (first plot if multi-plot)
+      try { sets.push(await extract(pdfData, { page: i, frame, ...opts })); }
       catch { sets.push(null); }   // a page with no curve paths -> no result for that page
     }
     allSets = sets;
@@ -328,10 +330,43 @@ async function snapToAxisBox(sel: [number, number, number, number]): Promise<[nu
   return best ?? sel;
 }
 
+/** Distinct plot axis-boxes on a page (ruled rectangles, deduped vs the grid, left-to-right). */
+function detectPlotBoxes(page: VectorPage): [number, number, number, number][] {
+  const boxes: [number, number, number, number][] = [];
+  for (const p of page.paths) {
+    if (!p.ruled || p.pts.length < 4) continue;
+    const bb = pathBbox(p.pts);
+    if (bb[2] - bb[0] < 40 || bb[3] - bb[1] < 40) continue;   // a real plot box, not a tick / short rule
+    if (boxes.some((b) => Math.abs(b[0] - bb[0]) < 14 && Math.abs(b[1] - bb[1]) < 14 && Math.abs(b[2] - bb[2]) < 14)) continue; // frame + grid share a bbox
+    boxes.push(bb);
+  }
+  return boxes.sort((a, b) => a[0] - b[0]);
+}
+
+/** The default frame for a page: the first plot box if the page holds several plots, else undefined (whole
+ *  page). Used so a multi-plot page shows ONE clean plot instead of the tangled whole-page extract. */
+async function autoBoxFrame(idx: number): Promise<[number, number, number, number] | undefined> {
+  if (!pdfData) return undefined;
+  try {
+    const boxes = detectPlotBoxes(await loadVectorPage(pdfData, idx));
+    return boxes.length >= 2 ? boxes[0] : undefined;
+  } catch { return undefined; }
+}
+
+/** On entering a page, auto-pick the first plot when it's a multi-plot page. */
+async function autoFrame(): Promise<void> {
+  selbox.hidden = true;
+  frameSel = (await autoBoxFrame(pageIndex)) ?? null;
+  multiPlot = frameSel !== null;
+  if (frameSel) placeSelbox(frameSel);
+}
+
 function updateRegionBar(): void {
   regionbar.hidden = stage.hidden;
   if (frameSel) {
-    regionmsg.innerHTML = `Extracting a <b style="color:var(--fg)">selected region</b> — drag again to reselect.`;
+    regionmsg.innerHTML = multiPlot
+      ? `Several plots on this page — showing one. <b style="color:var(--fg)">Drag a box</b> around another to switch.`
+      : `Extracting a <b style="color:var(--fg)">selected region</b> — drag again to reselect.`;
     wholepageBtn.hidden = false;
   } else {
     regionmsg.innerHTML = `<span class="hint">Multi-plot page? Drag a box around one plot's axes (tick labels just outside) to extract only that plot.</span>`;
@@ -372,7 +407,7 @@ stage.addEventListener("pointerup", async (e) => {
   void run(true);
 });
 wholepageBtn.addEventListener("click", () => {
-  frameSel = null; selbox.hidden = true;
+  frameSel = null; multiPlot = false; selbox.hidden = true;   // explicit override: show the whole page
   updateRegionBar();
   void run(true);
 });
