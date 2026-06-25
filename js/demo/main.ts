@@ -23,6 +23,7 @@ const pagebar = $("pagebar"), pageLabel = $("pagelabel");
 const prevBtn = $<HTMLButtonElement>("prev"), nextBtn = $<HTMLButtonElement>("next"), extractAllBtn = $<HTMLButtonElement>("extractall");
 const pagesWrap = $("pagesWrap"), pagesBody = $<HTMLElement>("pages").querySelector("tbody")!;
 const selbox = $("selbox"), regionbar = $("regionbar"), regionmsg = $("regionmsg"), wholepageBtn = $<HTMLButtonElement>("wholepage");
+const stagewrap = $("stagewrap");
 const dataplot = $<SVGSVGElement>("dataplot"), dataEmpty = $("dataEmpty"), tip = $("tip");
 
 type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
@@ -64,7 +65,8 @@ async function renderPage(i: number): Promise<void> {
   selbox.hidden = true;
   const page = await pdfDoc.getPage(i + 1);   // pdf.js pages are 1-based
   const unscaled = page.getViewport({ scale: 1 });
-  const avail = Math.max(240, stage.parentElement?.clientWidth ?? 760); // fit the stage container
+  stagewrap.style.setProperty("--stage-ar", String(unscaled.width / unscaled.height)); // reserve this page's box
+  const avail = Math.max(240, stagewrap.clientWidth || 760); // fit the stage container
   renderScale = Math.min(2, avail / unscaled.width);   // never exceed avail, so the canvas isn't CSS-scaled
   const viewport = page.getViewport({ scale: renderScale });
   pdfCanvas.width = Math.ceil(viewport.width);
@@ -157,6 +159,7 @@ function renderDataPlot(cs: CurveSet, animate: boolean): void {
     p.push(`</g>`);
   });
   dataplot.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  dataplot.style.setProperty("--data-ar", String(W / H));   // reserve the box at the plot's exact ratio
   dataplot.innerHTML = p.join("");
   lastHi = "";
   if (animate && !reduceMotion) {   // the re-plot is on white, so a left-to-right reveal actually shows
