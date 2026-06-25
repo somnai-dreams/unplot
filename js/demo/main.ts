@@ -5,7 +5,7 @@
  */
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extract, free, lobe, monotone, type OrderBy, type ShapePrior, smooth } from "../src/index.ts";
-import type { CurveSet } from "../src/index.ts";
+import type { CurveSet, Pt } from "../src/index.ts";
 import { loadVectorPage, pathBbox, type VectorPage } from "../src/io/vector.ts";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("./pdf.worker.js", import.meta.url).toString();
@@ -109,8 +109,7 @@ function drawOverlay(cs: CurveSet, animate: boolean): void {
       const hit = document.createElementNS(NS, "circle");   // generous, invisible hit area for hover
       hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "9");
       hit.setAttribute("fill", "transparent"); hit.setAttribute("class", "hit");
-      hit.setAttribute("data-c", String(i));
-      hit.setAttribute("data-x", fmtVal(c.points[k]![0])); hit.setAttribute("data-y", fmtVal(c.points[k]![1]));
+      hit.setAttribute("data-c", String(i)); hit.setAttribute("data-k", String(k)); // identity keys; value lives in lastSet
       g.appendChild(hit);
     }
     overlay.appendChild(g);
@@ -153,7 +152,7 @@ function renderDataPlot(cs: CurveSet, animate: boolean): void {
     for (let k = 0; k < c.points.length; k += step) {
       const cx = mapX(c.points[k]![0]).toFixed(1), cy = mapY(c.points[k]![1]).toFixed(1);
       p.push(`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${col}" stroke="#fff" stroke-width="1"/>`);
-      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-c="${i}" data-x="${fmtVal(c.points[k]![0])}" data-y="${fmtVal(c.points[k]![1])}"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="hit" data-c="${i}" data-k="${k}"/>`);
     }
     p.push(`</g>`);
   });
@@ -183,14 +182,22 @@ function setHighlight(c: string | null): void {
   }
 }
 
-/** Hover: a point shows its value (`.hit` circles carry data-x/data-y); any element with data-c raises its
+/** The recovered point a hovered `.hit` element refers to. data-c / data-k are identity keys only — the value
+ *  itself lives in lastSet, so the tooltip reads the single source of truth instead of a copy in the DOM. */
+function hoveredPoint(el: Element): Pt | null {
+  const c = el.getAttribute("data-c"), k = el.getAttribute("data-k");
+  if (c == null || k == null || !lastSet) return null;
+  return lastSet.curves[Number(c)]?.points[Number(k)] ?? null;
+}
+
+/** Hover: a point shows its value (resolved from lastSet via data-k); any element with data-c raises its
  *  curve in both panels. */
 function wireHover(svg: SVGElement): void {
   svg.addEventListener("mousemove", (e) => {
     const el = e.target as Element;
-    const x = el.getAttribute("data-x");
-    if (x != null) {
-      tip.innerHTML = `<span class="k">x</span> ${x}&nbsp;&nbsp;<span class="k">y</span> ${el.getAttribute("data-y")}`;
+    const pt = hoveredPoint(el);
+    if (pt) {
+      tip.innerHTML = `<span class="k">x</span> ${fmtVal(pt[0])}&nbsp;&nbsp;<span class="k">y</span> ${fmtVal(pt[1])}`;
       tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 14}px`;
       tip.hidden = false;
     } else tip.hidden = true;
