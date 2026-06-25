@@ -54,6 +54,7 @@ class CurveQA:
     passed: bool                   # violation < prior.tolerance
     n_points: int
     x_monotonic: bool              # x strictly increasing after sort + dedupe
+    roughness: float               # total y-variation / y-range — separation quality (high = a tangled merge)
     max_gap_x: float               # largest x gap (data units) — coverage-hole signal
     confidence: float              # 0..1 composite
     notes: tuple[str, ...]

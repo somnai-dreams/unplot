@@ -26,6 +26,7 @@ export function curveQA(pointsData: Pt[], prior: ShapePrior, notes: string[] = [
     passed: v.magnitude < prior.tolerance,
     nPoints: pointsData.length,
     xMonotonic: xmono,
+    roughness: round(shape.roughness(pointsData), 2),
     maxGapX: round(shape.maxGapX(pointsData), 4),
     confidence: confidence(v.magnitude, prior.tolerance, xmono),
     notes,

@@ -65,6 +65,20 @@ export function curvature(points: Pt[]): [number, number | null] {
   return [d2[j]! / rng, xs[j + 1]!];
 }
 
+/** Total vertical variation relative to y-range — how many times the curve reverses direction. A coherent
+ *  single curve is ~1-3 (monotone ≈1, one lobe ≈2); several overlapping same-style curves merged into one
+ *  tangle is dozens+. A separation-quality probe, NOT a shape prior: it flags a candidate that isn't a real
+ *  single curve regardless of the expected shape. */
+export function roughness(points: Pt[]): number {
+  const { ys } = xySorted(points);
+  if (ys.length < 2) return 0;
+  const rng = maxOf(ys) - minOf(ys);
+  if (rng <= 1e-9) return 0;
+  let tv = 0;
+  for (let i = 1; i < ys.length; i++) tv += Math.abs(ys[i]! - ys[i - 1]!);
+  return tv / rng;
+}
+
 /** Largest gap between consecutive x values (data units) — a coverage-hole signal. */
 export function maxGapX(points: Pt[]): number {
   const { xs } = xySorted(points);

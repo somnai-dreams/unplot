@@ -30,6 +30,7 @@ def curve_qa(points_data: NDArray, prior: ShapePrior, notes: tuple[str, ...] = (
     return CurveQA(
         prior=prior.name, violation=round(v.magnitude, 4), violation_kind=v.kind, violation_at=v.at,
         passed=passed, n_points=len(points_data), x_monotonic=xmono,
+        roughness=round(shape.roughness(points_data), 2),
         max_gap_x=round(shape.max_gap_x(points_data), 4),
         confidence=_confidence(v.magnitude, prior.tolerance, xmono), notes=notes,
     )

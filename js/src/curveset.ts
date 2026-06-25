@@ -43,6 +43,7 @@ export type CurveQA = {
   passed: boolean; // violation < prior.tolerance
   nPoints: number;
   xMonotonic: boolean; // x strictly increasing after sort + dedupe
+  roughness: number; // total y-variation / y-range — separation quality (high = a tangled merge, not one curve)
   maxGapX: number; // largest x gap (data units) — coverage-hole signal
   confidence: number; // 0..1 composite
   notes: string[];

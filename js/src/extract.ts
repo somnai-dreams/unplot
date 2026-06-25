@@ -27,6 +27,7 @@ export type ExtractOpts = {
   expectedCurves?: number | null;
   split?: boolean;
   minSegs?: number;
+  maxRoughness?: number; // drop candidates whose y-variation/range exceeds this (tangled merge, not one curve)
   defan?: Partial<DefanCfg>;
 };
 
@@ -52,13 +53,19 @@ const amplitude = (pointsData: Pt[]): number => maxOf(pointsData.map((p) => p[1]
 function buildCurves(
   cands: Candidate[], xAxis: AxisCalibration, yAxis: AxisCalibration,
   orderBy: OrderBy, prior: ShapePrior, methodLabel: Method, expectedCurves: number | null,
-): Curve[] {
+  maxRoughness: number,
+): { curves: Curve[]; droppedTangled: number } {
   let built = cands
     .map(([dash, color, pSrc]) => {
       const [pdata, psrc] = finalize(pSrc, xAxis, yAxis);
       return { dash, color, pdata, psrc, qa: curveQA(pdata, prior) };
     })
     .filter((b) => b.pdata.length >= 2);
+  // Drop tangled merges BEFORE the confidence trim: several overlapping same-style curves chained into one
+  // candidate are not a curve (y reverses dozens of times). Left in, such a blob has high amplitude and would
+  // even survive the expectedCurves selection, evicting a real curve.
+  const droppedTangled = built.filter((b) => b.qa.roughness > maxRoughness).length;
+  built = built.filter((b) => b.qa.roughness <= maxRoughness);
   // Confidence-aware selection: keep the `expectedCurves` best by confidence * amplitude. A real curve scores
   // high on BOTH; a tall malformed fragment has confidence ~0, and a tiny degenerate stub has amplitude ~0, so
   // either failure mode scores ~0 and can't displace a genuine lobe. (Selecting by amplitude alone was the bug.)
@@ -67,7 +74,7 @@ function buildCurves(
     built = built.slice(0, expectedCurves);
   }
   built.sort((a, b) => orderKey(a.pdata, orderBy) - orderKey(b.pdata, orderBy));
-  return built.map((b, k) => ({
+  const curves = built.map((b, k) => ({
     id: `c${k}`,
     orderIndex: k,
     style: { dash: b.dash, color: b.color, width: null },
@@ -76,6 +83,7 @@ function buildCurves(
     method: methodLabel,
     qa: b.qa,
   }));
+  return { curves, droppedTangled };
 }
 
 /** Synchronous core: extract a CurveSet from an already-loaded VectorPage. Vector path only. */
@@ -84,6 +92,7 @@ export function extractFromPage(page: VectorPage, opts: ExtractOpts = {}): Curve
   const orderBy = opts.orderBy ?? "peak-x";
   const expectedCurves = opts.expectedCurves ?? null;
   const minSegs = opts.minSegs ?? 3;
+  const maxRoughness = opts.maxRoughness ?? 12;
   const frame = opts.frame ?? curvePathsBbox(page, minSegs);
   if (frame === null) throw new Error("no curve paths found on page; pass an explicit `frame`");
 
@@ -94,9 +103,11 @@ export function extractFromPage(page: VectorPage, opts: ExtractOpts = {}): Curve
     expectedCurves, split: opts.split ?? false, ...(opts.defan ? { defan: opts.defan } : {}),
   });
   const label: Method = method === "style" ? "vector-path" : "vector-defan-chain";
-  const curves = buildCurves(cands, xCal, yCal, orderBy, prior, label, expectedCurves);
+  const { curves, droppedTangled } = buildCurves(cands, xCal, yCal, orderBy, prior, label, expectedCurves, maxRoughness);
 
   const warnings: string[] = [];
+  if (droppedTangled > 0)
+    warnings.push(`dropped ${droppedTangled} tangled curve${droppedTangled > 1 ? "s" : ""} (roughness > ${maxRoughness}) — overlapping same-style curves the separator couldn't tell apart`);
   if (Math.abs(xCal.r) < 0.999 || Math.abs(yCal.r) < 0.999)
     warnings.push(`axis fit r below 0.999 (x=${xCal.r.toFixed(4)}, y=${yCal.r.toFixed(4)})`);
   if (expectedCurves != null && curves.length !== expectedCurves)

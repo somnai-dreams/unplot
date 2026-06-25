@@ -86,6 +86,22 @@ def curvature(points: NDArray) -> tuple[float, float | None]:
     return float(d2[j] / rng), float(xs[j + 1])
 
 
+def roughness(points: NDArray) -> float:
+    """Total vertical variation relative to y-range — how many times the curve reverses direction.
+
+    A coherent single curve is ~1-3 (monotone ~1, one lobe ~2); several overlapping same-style curves
+    merged into one tangle is dozens+. A separation-quality probe, NOT a shape prior: it flags a candidate
+    that isn't a real single curve regardless of the expected shape.
+    """
+    _, ys = _xy_sorted(points)
+    if len(ys) < 2:
+        return 0.0
+    rng = float(ys.max() - ys.min())
+    if rng <= 1e-9:
+        return 0.0
+    return float(np.abs(np.diff(ys)).sum() / rng)
+
+
 def max_gap_x(points: NDArray) -> float:
     """Largest gap between consecutive x values (data units) — a coverage-hole signal."""
     xs, _ = _xy_sorted(points)

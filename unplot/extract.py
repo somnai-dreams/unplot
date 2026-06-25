@@ -52,27 +52,34 @@ def extract(source: str | NDArray, *, page: int = 0,
             prior: ShapePrior = Free(), order_by: OrderBy = "peak-x",
             expected_curves: int | None = None,
             ingest: Literal["auto", "vector", "raster"] = "auto",
-            split: bool = False, min_segs: int = 3, defan: dict | None = None) -> CurveSet:
+            split: bool = False, min_segs: int = 3, max_roughness: float = 12.0,
+            defan: dict | None = None) -> CurveSet:
     """`defan` tunes the polyline (de-fan/chain) separation; pass separate.DEFAN_POLYLINE for
-    continuous-stroke polyline sheets. `split=True` separates lobes a sheet draws as one stroke."""
+    continuous-stroke polyline sheets. `split=True` separates lobes a sheet draws as one stroke.
+    `max_roughness` drops candidates whose y-variation/range exceeds it (a tangled merge, not one curve)."""
     if ingest == "auto":
         ingest = "vector" if (isinstance(source, str) and iov.is_vector(source, page)) else "raster"
     if ingest == "vector":
         return _extract_vector(source, page, frame, x_axis, y_axis, prior, order_by,
-                               expected_curves, split, min_segs, defan)
-    return _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expected_curves)
+                               expected_curves, split, min_segs, max_roughness, defan)
+    return _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expected_curves, max_roughness)
 
 
 def _amplitude(points_data: NDArray) -> float:
     return float(points_data[:, 1].max() - points_data[:, 1].min())
 
 
-def _build_curves(cands, x_axis, y_axis, order_by, prior, method_label, expected_curves=None):
+def _build_curves(cands, x_axis, y_axis, order_by, prior, method_label, expected_curves=None, max_roughness=12.0):
     built = []
     for dash, color, P_src in cands:
         pdata, psrc = _finalize(P_src, x_axis, y_axis)
         if len(pdata) >= 2:
             built.append((dash, color, pdata, psrc, curve_qa(pdata, prior)))
+    # Drop tangled merges BEFORE the confidence trim: several overlapping same-style curves chained into one
+    # candidate are not a curve (y reverses dozens of times). Left in, such a blob has high amplitude and would
+    # even survive the expected_curves selection, evicting a real curve.
+    dropped_tangled = sum(1 for t in built if t[4].roughness > max_roughness)
+    built = [t for t in built if t[4].roughness <= max_roughness]
     # Confidence-aware selection: keep the `expected_curves` best by confidence * amplitude. A real curve scores
     # high on BOTH; a tall malformed fragment has confidence ~0, and a tiny degenerate stub has amplitude ~0, so
     # either failure mode scores ~0 and can't displace a genuine lobe. (Selecting by amplitude alone was the bug:
@@ -86,10 +93,11 @@ def _build_curves(cands, x_axis, y_axis, order_by, prior, method_label, expected
         style = CurveStyle(dash=dash, color=tuple(color) if color else None, width=None)
         curves.append(Curve(id=f"c{k}", order_index=k, style=style, points=pdata,
                             points_src=psrc, method=method_label, qa=qa))
-    return tuple(curves)
+    return tuple(curves), dropped_tangled
 
 
-def _extract_vector(path, page, frame, x_axis, y_axis, prior, order_by, expected_curves, split, min_segs, defan):
+def _extract_vector(path, page, frame, x_axis, y_axis, prior, order_by, expected_curves, split, min_segs,
+                    max_roughness, defan):
     vp = iov.load(path, page)
     if frame is None:
         frame = iov.curve_paths_bbox(vp, min_segs)
@@ -100,9 +108,12 @@ def _extract_vector(path, page, frame, x_axis, y_axis, prior, order_by, expected
     raw = iov.paths_in_frame(vp, frame, min_segs)
     cands, method = separate(raw, expected_curves=expected_curves, split=split, defan=defan)
     label = "vector-path" if method == "style" else "vector-defan-chain"
-    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, label, expected_curves)
+    curves, dropped_tangled = _build_curves(cands, x_cal, y_cal, order_by, prior, label, expected_curves, max_roughness)
 
     warnings: list[str] = []
+    if dropped_tangled > 0:
+        warnings.append(f"dropped {dropped_tangled} tangled curve{'s' if dropped_tangled > 1 else ''} "
+                        f"(roughness > {max_roughness:g}) — overlapping same-style curves the separator couldn't tell apart")
     if abs(x_cal.r) < 0.999 or abs(y_cal.r) < 0.999:
         warnings.append(f"axis fit r below 0.999 (x={x_cal.r:.4f}, y={y_cal.r:.4f})")
     if expected_curves and len(curves) != expected_curves:
@@ -113,7 +124,7 @@ def _extract_vector(path, page, frame, x_axis, y_axis, prior, order_by, expected
 
 
 def _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expected_curves,
-                    dpi: int = 300, dark: int = 160):
+                    max_roughness=12.0, dpi: int = 300, dark: int = 160):
     """Carved raster primitives wired into fragment-then-chain separation under the injected prior. Clean
     crossings separate (tests/test_raster_monotone.py, test_prior_separation.py); many curves overlapping
     over a range are not fully solved and the QA reports it. Needs an explicit `frame` (px) and explicit
@@ -153,8 +164,11 @@ def _extract_raster(source, page, frame, x_axis, y_axis, prior, order_by, expect
         chained = rp.chain_fragments(frags, prior=prior)
         cands, method = [(None, None, c) for c in chained], "raster-march"   # selection is confidence-aware below
 
-    curves = _build_curves(cands, x_cal, y_cal, order_by, prior, method, expected_curves)
+    curves, dropped_tangled = _build_curves(cands, x_cal, y_cal, order_by, prior, method, expected_curves, max_roughness)
     warnings: list[str] = []
+    if dropped_tangled > 0:
+        warnings.append(f"dropped {dropped_tangled} tangled curve{'s' if dropped_tangled > 1 else ''} "
+                        f"(roughness > {max_roughness:g}) — overlapping same-style curves the separator couldn't tell apart")
     if count_crossings(curves) > 0:
         warnings.append("raster: recovered curves cross — separation may have tangled them at a crossing; "
                         "verify, or use vector ingest / per-family anchors")

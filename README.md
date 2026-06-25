@@ -65,6 +65,7 @@ Supported: vector-PDF ingest (exact geometry) and raster images (pixel fallback)
 Not yet, and PRs welcome:
 
 - **Log-spaced axes.** Calibration is linear pt-to-value. Axes whose *values* are log quantities work fine when they're drawn linearly; genuinely log-*spaced* axes are not.
+- **Many identically-styled curves on one plot.** With no colour or dash to tell them apart (e.g. a five-curve grey density plot), the separator can merge overlapping ones. The merge is detected — a `roughness` check, total y-variation over y-range — and the tangle is dropped with a warning rather than returned as a curve; cleanly-separated curves on the same plot still come back.
 - **Heavily occluded mono scans.** Colour curves separate by hue; single-colour curves separate by continuity and the shape prior, which handles clean crossings. A low-resolution mono *scan* with a weak curve buried under a stronger one can mis-assign, and the QA reports it as low confidence. Use vector ingest or a colour-coded source there.
 - Broken axis boxes, legends drawn over curves, exotic scales, automatic frame detection for raster scans.
 
